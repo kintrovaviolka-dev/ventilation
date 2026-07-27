@@ -37,17 +37,27 @@ export const WaveformCanvas: React.FC<WaveformCanvasProps> = ({
 
     let animationFrameId: number;
     const startTime = performance.now();
-    const sweepDurationSec = 6.0; // 6-second total horizontal sweep speed
+    const sweepDurationSec = 10.0; // 10-second horizontal sweep speed (compresses curve width)
 
     const render = (now: number) => {
       const elapsedSec = (now - startTime) / 1000;
-      const width = canvas.width;
-      const height = canvas.height;
+      const rect = canvas.getBoundingClientRect();
+      const width = Math.floor(rect.width);
+      const height = Math.floor(rect.height);
 
       if (width === 0 || height === 0) {
         animationFrameId = requestAnimationFrame(render);
         return;
       }
+
+      const dpr = window.devicePixelRatio || 1;
+
+      // Clear full canvas buffer
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Save and scale context for crisp high-DPI drawing in CSS pixel coordinates
+      ctx.save();
+      ctx.scale(dpr, dpr);
 
       // Initialize or reset buffer array if canvas size changed
       if (historyRef.current.length !== width) {
@@ -207,7 +217,7 @@ export const WaveformCanvas: React.FC<WaveformCanvasProps> = ({
 
         // Draw Waveform Curve Segments
         ctx.strokeStyle = ch.color;
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 3.0;
         ctx.lineJoin = 'round';
         ctx.lineCap = 'round';
 
@@ -262,7 +272,7 @@ export const WaveformCanvas: React.FC<WaveformCanvasProps> = ({
 
       // 5. Draw Sweeping Beam Vertical Line
       ctx.strokeStyle = '#22D3EE';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 2.5;
       ctx.shadowColor = '#06B6D4';
       ctx.shadowBlur = 6;
       ctx.beginPath();
@@ -270,6 +280,8 @@ export const WaveformCanvas: React.FC<WaveformCanvasProps> = ({
       ctx.lineTo(currSweepX, height);
       ctx.stroke();
       ctx.shadowBlur = 0; // reset glow
+
+      ctx.restore();
 
       animationFrameId = requestAnimationFrame(render);
     };
@@ -287,9 +299,12 @@ export const WaveformCanvas: React.FC<WaveformCanvasProps> = ({
       const canvas = canvasRef.current;
       if (!canvas) return;
       const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
       if (rect.width > 0 && rect.height > 0) {
-        canvas.width = Math.floor(rect.width);
-        canvas.height = Math.floor(rect.height);
+        canvas.style.width = `${rect.width}px`;
+        canvas.style.height = `${rect.height}px`;
+        canvas.width = Math.floor(rect.width * dpr);
+        canvas.height = Math.floor(rect.height * dpr);
       }
     };
 

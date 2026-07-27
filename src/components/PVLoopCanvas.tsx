@@ -43,13 +43,23 @@ export const PVLoopCanvas: React.FC<PVLoopCanvasProps> = ({
 
     const render = (now: number) => {
       const elapsedSec = (now - startTime) / 1000;
-      const width = canvas.width;
-      const height = canvas.height;
+      const rect = canvas.getBoundingClientRect();
+      const width = Math.floor(rect.width);
+      const height = Math.floor(rect.height);
 
       if (width === 0 || height === 0) {
         animationFrameId = requestAnimationFrame(render);
         return;
       }
+
+      const dpr = window.devicePixelRatio || 1;
+
+      // Clear full canvas buffer
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Save and scale context for crisp high-DPI drawing in CSS pixel coordinates
+      ctx.save();
+      ctx.scale(dpr, dpr);
 
       // Get current instantaneous point
       const breath = getInstantaneousBreath(elapsedSec, settings, patient, mode);
@@ -69,7 +79,7 @@ export const PVLoopCanvas: React.FC<PVLoopCanvasProps> = ({
         volume: breath.volume,
       });
 
-      // Clear Canvas
+      // Clear Canvas inside scaled coordinate space
       ctx.fillStyle = '#060606';
       ctx.fillRect(0, 0, width, height);
 
@@ -198,6 +208,8 @@ export const PVLoopCanvas: React.FC<PVLoopCanvasProps> = ({
         ctx.stroke();
       }
 
+      ctx.restore();
+
       animationFrameId = requestAnimationFrame(render);
     };
 
@@ -214,9 +226,12 @@ export const PVLoopCanvas: React.FC<PVLoopCanvasProps> = ({
       const canvas = canvasRef.current;
       if (!canvas) return;
       const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
       if (rect.width > 0 && rect.height > 0) {
-        canvas.width = Math.floor(rect.width);
-        canvas.height = Math.floor(rect.height);
+        canvas.style.width = `${rect.width}px`;
+        canvas.style.height = `${rect.height}px`;
+        canvas.width = Math.floor(rect.width * dpr);
+        canvas.height = Math.floor(rect.height * dpr);
       }
     };
 

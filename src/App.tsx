@@ -386,10 +386,10 @@ export function App() {
         onSilenceToggle={() => setIsSilenced(!isSilenced)}
       />
 
-      {/* Main Screen Layout (Optimized for Mobile Landscape 16:9 to 20:9 viewport) */}
-      <main className="flex-1 p-2 grid grid-rows-12 gap-2 overflow-hidden max-w-[1920px] w-full mx-auto">
+      {/* Main Screen Layout (Optimized for Mobile Landscape and Responsive Portrait Viewports) */}
+      <main className="flex-1 p-2 md:grid md:grid-rows-12 gap-2 md:overflow-hidden overflow-y-auto max-w-[1920px] w-full mx-auto flex flex-col">
         {/* UPPER SECTION (Top 55% of height / Rows 1 to 7): Real-time Waveforms */}
-        <section className="row-span-7 w-full h-full min-h-0">
+        <section className="h-[240px] md:h-full md:row-span-7 w-full shrink-0 min-h-0">
           <WaveformCanvas
             settings={settings}
             patient={patient}
@@ -399,9 +399,9 @@ export function App() {
         </section>
 
         {/* LOWER SECTION (Bottom 45% of height / Rows 8 to 12): Split into P-V Loop, Telemetry Tiles, Medications, and GE Dial */}
-        <section className="row-span-5 w-full h-full min-h-0 grid grid-cols-12 gap-2">
+        <section className="flex flex-col md:grid md:grid-cols-12 md:row-span-5 w-full min-h-0 gap-2 shrink-0 md:shrink">
           {/* Lower Left Quadrant: Pressure-Volume (P-V) Loop Canvas (Cols 1 to 3) */}
-          <div className="col-span-3 h-full min-h-0">
+          <div className="order-5 md:order-none h-[180px] md:h-full md:col-span-3 min-h-0 shrink-0">
             <PVLoopCanvas
               settings={settings}
               patient={patient}
@@ -411,7 +411,7 @@ export function App() {
           </div>
 
           {/* Lower Middle-Left Quadrant: Numeric Telemetry & Setting Readout Tiles (Cols 4 to 7) */}
-          <div className="col-span-4 h-full min-h-0">
+          <div className="order-2 md:order-none h-[230px] md:h-full md:col-span-4 min-h-0 shrink-0">
             <NumericTilesPanel
               physiology={physiology}
               settings={settings}
@@ -426,7 +426,7 @@ export function App() {
           </div>
 
           {/* Lower Middle-Right Quadrant: Medications & Anesthesia Panel (Cols 8 to 9) */}
-          <div className="col-span-2 h-full min-h-0">
+          <div className="order-4 md:order-none h-[210px] md:h-full md:col-span-2 min-h-0 shrink-0">
             <MedicationPanel
               language={language}
               sevofluraneMac={sevofluraneMac}
@@ -439,7 +439,7 @@ export function App() {
           </div>
 
           {/* Lower Right Quadrant: Hardware Simulation Control Knob (Cols 10 to 12) */}
-          <div className="col-span-3 h-full min-h-0">
+          <div className="order-3 md:order-none h-[250px] md:h-full md:col-span-3 min-h-0 shrink-0">
             <HardwareDial
               controlMode={controlMode}
               activeParam={activeParam}

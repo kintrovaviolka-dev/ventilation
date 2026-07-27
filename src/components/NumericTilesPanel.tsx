@@ -46,7 +46,7 @@ export const NumericTilesPanel: React.FC<NumericTilesPanelProps> = ({
   ];
 
   return (
-    <div className="w-full h-full bg-[#080808] border border-[#222222] rounded p-2 flex flex-col justify-between select-none shadow-inner overflow-y-auto">
+    <div className="w-full h-full bg-[#080808] border border-[#222222] rounded p-2 flex flex-col justify-between select-none shadow-inner md:overflow-y-auto overflow-hidden">
       {/* 1. Measured Live Telemetry Readouts (Upper half of lower-right region) */}
       <div className="mb-2">
         <div className="flex items-center justify-between px-1 mb-1 border-b border-[#1F1F1F] pb-0.5">

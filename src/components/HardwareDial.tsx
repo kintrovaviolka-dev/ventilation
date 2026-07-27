@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { RotateCw, Check, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ControlMode, ParameterSpec } from '../lib/controlSystem';
 import { playDialTick, playConfirmChime, playCancelBeep } from '../lib/audioTone';
@@ -27,6 +27,24 @@ export const HardwareDial: React.FC<HardwareDialProps> = ({
   onCancel,
 }) => {
   const [knobAngle, setKnobAngle] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const knobRef = useRef<HTMLDivElement>(null);
+  const isDraggingRef = useRef(false);
+  const lastAngleRef = useRef(0);
+  const accumulatedRotationRef = useRef(0);
+  const hasDraggedRef = useRef(false);
+
+  const onTurnRef = useRef(onTurn);
+  const onPushRef = useRef(onPush);
+
+  useEffect(() => {
+    onTurnRef.current = onTurn;
+  }, [onTurn]);
+
+  useEffect(() => {
+    onPushRef.current = onPush;
+  }, [onPush]);
 
   const handleTurnLeft = () => {
     setKnobAngle((prev) => prev - 22.5);
@@ -48,6 +66,125 @@ export const HardwareDial: React.FC<HardwareDialProps> = ({
     }
     onPush();
   };
+
+  useEffect(() => {
+    const knob = knobRef.current;
+    if (!knob) return;
+
+    const getCenter = () => {
+      const rect = knob.getBoundingClientRect();
+      return {
+        cx: rect.left + rect.width / 2,
+        cy: rect.top + rect.height / 2,
+      };
+    };
+
+    const handlePointerDown = (clientX: number, clientY: number) => {
+      isDraggingRef.current = true;
+      setIsDragging(true);
+      hasDraggedRef.current = false;
+      const { cx, cy } = getCenter();
+      const dx = clientX - cx;
+      const dy = clientY - cy;
+      lastAngleRef.current = Math.atan2(dy, dx) * (180 / Math.PI);
+      accumulatedRotationRef.current = 0;
+    };
+
+    const handlePointerMove = (clientX: number, clientY: number, e: Event) => {
+      if (!isDraggingRef.current) return;
+
+      if (e.cancelable) {
+        e.preventDefault();
+      }
+
+      const { cx, cy } = getCenter();
+      const dx = clientX - cx;
+      const dy = clientY - cy;
+      const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+
+      let diff = angle - lastAngleRef.current;
+      if (diff > 180) diff -= 360;
+      if (diff < -180) diff += 360;
+
+      lastAngleRef.current = angle;
+      accumulatedRotationRef.current += diff;
+
+      // Rotate visually instantly matching pointer rotation
+      setKnobAngle((prev) => prev + diff);
+
+      if (Math.abs(accumulatedRotationRef.current) > 5) {
+        hasDraggedRef.current = true;
+      }
+
+      // Step threshold of 18 degrees per parameter increment/decrement
+      const threshold = 18;
+      if (accumulatedRotationRef.current >= threshold) {
+        onTurnRef.current(1);
+        playDialTick();
+        accumulatedRotationRef.current = accumulatedRotationRef.current % threshold;
+      } else if (accumulatedRotationRef.current <= -threshold) {
+        onTurnRef.current(-1);
+        playDialTick();
+        accumulatedRotationRef.current = accumulatedRotationRef.current % -threshold;
+      }
+    };
+
+    const handlePointerUp = () => {
+      if (!isDraggingRef.current) return;
+      isDraggingRef.current = false;
+      setIsDragging(false);
+
+      if (!hasDraggedRef.current) {
+        handlePush();
+      }
+    };
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 1) {
+        handlePointerDown(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 1) {
+        handlePointerMove(e.touches[0].clientX, e.touches[0].clientY, e);
+      }
+    };
+
+    const onTouchEnd = (e: TouchEvent) => {
+      handlePointerUp();
+    };
+
+    const onMouseDown = (e: MouseEvent) => {
+      handlePointerDown(e.clientX, e.clientY);
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    };
+
+    const onMouseMove = (e: MouseEvent) => {
+      handlePointerMove(e.clientX, e.clientY, e);
+    };
+
+    const onMouseUp = () => {
+      handlePointerUp();
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+
+    knob.addEventListener('touchstart', onTouchStart, { passive: false });
+    knob.addEventListener('touchmove', onTouchMove, { passive: false });
+    knob.addEventListener('touchend', onTouchEnd, { passive: false });
+    knob.addEventListener('mousedown', onMouseDown);
+
+    return () => {
+      knob.removeEventListener('touchstart', onTouchStart);
+      knob.removeEventListener('touchmove', onTouchMove);
+      knob.removeEventListener('touchend', onTouchEnd);
+      knob.removeEventListener('mousedown', onMouseDown);
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+  }, [handlePush]);
 
   return (
     <div className="w-full h-full bg-[#0E0E0E] border border-[#222222] rounded-lg p-2.5 flex flex-col justify-between items-center select-none shadow-xl relative overflow-hidden">
@@ -116,9 +253,11 @@ export const HardwareDial: React.FC<HardwareDialProps> = ({
         <div className="w-24 h-24 rounded-full bg-gradient-to-b from-[#2A2A2A] to-[#0A0A0A] p-1 shadow-2xl border border-[#3A3A3A] flex items-center justify-center">
           {/* Inner Rotating Knob */}
           <div
-            className="w-20 h-20 rounded-full bg-gradient-to-b from-[#1F2428] to-[#0C0F12] border-2 border-cyan-500/40 flex items-center justify-center relative cursor-pointer active:scale-95 transition-transform duration-100 shadow-inner"
+            ref={knobRef}
+            className={`w-20 h-20 rounded-full bg-gradient-to-b from-[#1F2428] to-[#0C0F12] border-2 border-cyan-500/40 flex items-center justify-center relative cursor-pointer active:scale-95 shadow-inner ${
+              isDragging ? 'transition-none' : 'transition-transform duration-100'
+            }`}
             style={{ transform: `rotate(${knobAngle}deg)` }}
-            onClick={handlePush}
           >
             {/* Grip ridges on knob */}
             <div className="absolute inset-1 rounded-full border border-dashed border-zinc-700/60 pointer-events-none" />
