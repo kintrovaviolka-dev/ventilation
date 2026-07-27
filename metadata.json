@@ -1,0 +1,6 @@
+{
+  "name": "Mechanical Ventilation Simulator",
+  "description": "Interactive critical care mechanical ventilation simulator with real-time telemetry, waveform channels, ventilator console, and patient compliance modeling.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
