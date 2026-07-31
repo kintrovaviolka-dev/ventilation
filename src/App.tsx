@@ -35,6 +35,10 @@ export function App() {
   const [language, setLanguage] = useState<Language>('en');
   const [appStep, setAppStep] = useState<AppStep>('welcome');
 
+  // Workspace layout control states (electible choices)
+  const [showPVLoop, setShowPVLoop] = useState(true);
+  const [showMeds, setShowMeds] = useState(true);
+
   // Active Clinical Case & Induction Medications
   const [selectedCase, setSelectedCase] = useState<PatientCase>(PATIENT_CASES[0]);
   const [activeEvent, setActiveEvent] = useState<IntraoperativeEvent>(INTRAOPERATIVE_EVENTS[0]);
@@ -314,6 +318,26 @@ export function App() {
     }
   };
 
+  // Dynamic column spans for lower dashboard grid based on visible panels (electible choices)
+  const pvColSpan = 'md:col-span-3';
+  const medsColSpan = !showPVLoop ? 'md:col-span-3' : 'md:col-span-2';
+
+  const numericColSpan = showPVLoop && showMeds
+    ? 'md:col-span-4'
+    : !showPVLoop && showMeds
+    ? 'md:col-span-6'
+    : showPVLoop && !showMeds
+    ? 'md:col-span-6'
+    : 'md:col-span-8';
+
+  const dialColSpan = showPVLoop && showMeds
+    ? 'md:col-span-3'
+    : !showPVLoop && showMeds
+    ? 'md:col-span-3'
+    : showPVLoop && !showMeds
+    ? 'md:col-span-3'
+    : 'md:col-span-4';
+
   const t = TRANSLATIONS[language] || TRANSLATIONS.en;
 
   // ROUTE 1: Welcome Screen
@@ -378,6 +402,38 @@ export function App() {
         }}
       />
 
+      {/* Workspace Panel Configuration Row (Electible Choices) */}
+      <div className="bg-[#0C1216] border-b border-[#1A2830] px-4 py-1 flex flex-wrap items-center justify-between text-[10px] md:text-xs font-mono select-none gap-2">
+        <div className="flex items-center gap-3">
+          <span className="text-[#839493] font-bold uppercase tracking-wider text-[9px] md:text-[10px]">
+            {language === 'cs' ? 'ZOBRAZENÍ PANELŮ:' : 'WORKSPACE PANELS:'}
+          </span>
+          <button
+            onClick={() => setShowPVLoop(prev => !prev)}
+            className={`px-2 py-0.5 rounded text-[9px] md:text-[10px] font-bold border transition-all cursor-pointer ${
+              showPVLoop
+                ? 'bg-cyan-950/80 text-cyan-300 border-cyan-500/40 shadow-[0_0_8px_rgba(6,182,212,0.15)]'
+                : 'bg-zinc-900/60 text-zinc-500 border-zinc-800'
+            }`}
+          >
+            {showPVLoop ? '✓ P-V Loop' : '✗ P-V Loop'}
+          </button>
+          <button
+            onClick={() => setShowMeds(prev => !prev)}
+            className={`px-2 py-0.5 rounded text-[9px] md:text-[10px] font-bold border transition-all cursor-pointer ${
+              showMeds
+                ? 'bg-cyan-950/80 text-cyan-300 border-cyan-500/40 shadow-[0_0_8px_rgba(6,182,212,0.15)]'
+                : 'bg-zinc-900/60 text-zinc-500 border-zinc-800'
+            }`}
+          >
+            {showMeds ? '✓ Medications' : '✗ Medications'}
+          </button>
+        </div>
+        <div className="text-[8px] md:text-[9px] text-zinc-500">
+          {language === 'cs' ? 'Kliknutím skryjete panely a uvolníte místo na displeji' : 'Toggle optional panels to optimize screen layout'}
+        </div>
+      </div>
+
       {/* Alarm Banner Overlay */}
       <AlarmBanner
         language={language}
@@ -401,17 +457,19 @@ export function App() {
         {/* LOWER SECTION (Bottom 45% of height / Rows 8 to 12): Split into P-V Loop, Telemetry Tiles, Medications, and GE Dial */}
         <section className="flex flex-col md:grid md:grid-cols-12 md:row-span-5 w-full min-h-0 gap-2 shrink-0 md:shrink">
           {/* Lower Left Quadrant: Pressure-Volume (P-V) Loop Canvas (Cols 1 to 3) */}
-          <div className="order-5 md:order-none h-[180px] md:h-full md:col-span-3 min-h-0 shrink-0">
-            <PVLoopCanvas
-              settings={settings}
-              patient={patient}
-              mode={mode}
-              language={language}
-            />
-          </div>
+          {showPVLoop && (
+            <div className={`order-5 md:order-none h-[180px] md:h-full ${pvColSpan} min-h-0 shrink-0`}>
+              <PVLoopCanvas
+                settings={settings}
+                patient={patient}
+                mode={mode}
+                language={language}
+              />
+            </div>
+          )}
 
           {/* Lower Middle-Left Quadrant: Numeric Telemetry & Setting Readout Tiles (Cols 4 to 7) */}
-          <div className="order-2 md:order-none h-[230px] md:h-full md:col-span-4 min-h-0 shrink-0">
+          <div className={`order-2 md:order-none h-auto md:h-full ${numericColSpan} min-h-[230px] shrink-0`}>
             <NumericTilesPanel
               physiology={physiology}
               settings={settings}
@@ -426,20 +484,22 @@ export function App() {
           </div>
 
           {/* Lower Middle-Right Quadrant: Medications & Anesthesia Panel (Cols 8 to 9) */}
-          <div className="order-4 md:order-none h-[210px] md:h-full md:col-span-2 min-h-0 shrink-0">
-            <MedicationPanel
-              language={language}
-              sevofluraneMac={sevofluraneMac}
-              setSevofluraneMac={setSevofluraneMac}
-              nmbLevel={nmbLevel}
-              administerNmb={() => setNmbLevel(100)}
-              sedationLevel={sedationLevel}
-              administerSedative={() => setSedationLevel(100)}
-            />
-          </div>
+          {showMeds && (
+            <div className={`order-4 md:order-none h-[210px] md:h-full ${medsColSpan} min-h-0 shrink-0`}>
+              <MedicationPanel
+                language={language}
+                sevofluraneMac={sevofluraneMac}
+                setSevofluraneMac={setSevofluraneMac}
+                nmbLevel={nmbLevel}
+                administerNmb={() => setNmbLevel(100)}
+                sedationLevel={sedationLevel}
+                administerSedative={() => setSedationLevel(100)}
+              />
+            </div>
+          )}
 
           {/* Lower Right Quadrant: Hardware Simulation Control Knob (Cols 10 to 12) */}
-          <div className="order-3 md:order-none h-[250px] md:h-full md:col-span-3 min-h-0 shrink-0">
+          <div className={`order-3 md:order-none h-[250px] md:h-full ${dialColSpan} min-h-0 shrink-0`}>
             <HardwareDial
               controlMode={controlMode}
               activeParam={activeParam}

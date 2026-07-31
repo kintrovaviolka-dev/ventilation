@@ -30,6 +30,7 @@ export const WaveformCanvas: React.FC<WaveformCanvasProps> = ({
   const lastSweepXRef = useRef<number>(-1);
 
   useEffect(() => {
+    lastSweepXRef.current = -1;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -59,14 +60,28 @@ export const WaveformCanvas: React.FC<WaveformCanvasProps> = ({
       ctx.save();
       ctx.scale(dpr, dpr);
 
-      // Initialize or reset buffer array if canvas size changed
-      if (historyRef.current.length !== width) {
-        historyRef.current = new Array(width).fill({ pressure: settings.peep || 5, flow: 0, volume: 0 });
-        lastSweepXRef.current = -1;
-      }
-
       // Current exact integer X position of the sweeping beam
       const currSweepX = Math.floor(((elapsedSec % sweepDurationSec) / sweepDurationSec) * width);
+
+      // Initialize or reset buffer array if canvas size changed or first frame of a new settings run
+      if (historyRef.current.length !== width || lastSweepXRef.current === -1) {
+        const newHistory = new Array(width);
+        for (let x = 0; x < width; x++) {
+          let dx = currSweepX - x;
+          if (dx < 0) dx += width;
+          const tPast = (dx / width) * sweepDurationSec;
+          const tSim = elapsedSec - tPast;
+          const pt = getInstantaneousBreath(tSim, settings, patient, mode);
+          newHistory[x] = {
+            pressure: pt.pressure,
+            flow: pt.flow,
+            volume: pt.volume,
+          };
+        }
+        historyRef.current = newHistory;
+        lastSweepXRef.current = currSweepX;
+      }
+
       const currentBreath = getInstantaneousBreath(elapsedSec, settings, patient, mode);
 
       // Fill history buffer across ALL intermediate pixels between last frame and this frame

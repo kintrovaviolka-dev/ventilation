@@ -30,6 +30,22 @@ export const PVLoopCanvas: React.FC<PVLoopCanvasProps> = ({
   const lastPhaseRef = useRef<'insp' | 'exp'>('insp');
 
   useEffect(() => {
+    // Pre-populate previous loop with a full clean cycle under the new parameters
+    const rr = Math.max(4, settings.rr || 12);
+    const cycleTime = 60 / rr;
+    const numPoints = 100;
+    const prePts: Point2D[] = [];
+    for (let i = 0; i <= numPoints; i++) {
+      const t = (i / numPoints) * cycleTime;
+      const breath = getInstantaneousBreath(t, settings, patient, mode);
+      prePts.push({ pressure: breath.pressure, volume: breath.volume });
+    }
+    previousLoopRef.current = prePts;
+
+    // Clear current loop to start fresh
+    currentLoopRef.current = [];
+    lastPhaseRef.current = 'insp';
+
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
