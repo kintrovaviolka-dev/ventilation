@@ -2,7 +2,7 @@ export type Language = 'en' | 'cs';
 
 export type VentMode = 'vc' | 'pc' | 'simv' | 'ps';
 
-export type AppStep = 'welcome' | 'intake' | 'simulation';
+export type AppStep = 'welcome' | 'intake' | 'simulation' | 'practice';
 
 export interface VentilatorSettings {
   fio2: number;       // Oxygen percentage 21-100%

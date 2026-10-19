@@ -30,10 +30,14 @@ import {
 } from './lib/controlSystem';
 import { playCancelBeep, startAlarmSound, stopAlarmTones } from './lib/audioTone';
 import { TRANSLATIONS } from './i18n/translations';
+import { PracticeScreen } from './components/PracticeScreen';
 
 export function App() {
   const [language, setLanguage] = useState<Language>('en');
   const [appStep, setAppStep] = useState<AppStep>('welcome');
+  const [simulationStartTime, setSimulationStartTime] = useState(0);
+  const practiceOrigin = useRef<AppStep>('welcome');
+  const practiceOpenedAt = useRef(0);
 
   // Workspace layout control states (electible choices)
   const [showPVLoop, setShowPVLoop] = useState(true);
@@ -340,6 +344,23 @@ export function App() {
 
   const t = TRANSLATIONS[language] || TRANSLATIONS.en;
 
+  const openPractice = () => {
+    practiceOrigin.current = appStep;
+    practiceOpenedAt.current = performance.now();
+    setControlMode('NAVIGATING');
+    setAppStep('practice');
+  };
+
+  if (appStep === 'practice') {
+    return <PracticeScreen language={language} setLanguage={setLanguage} onBack={() => {
+      if (practiceOrigin.current === 'simulation') {
+        const pausedFor = performance.now() - practiceOpenedAt.current;
+        setSimulationStartTime((start) => start + pausedFor);
+      }
+      setAppStep(practiceOrigin.current);
+    }} />;
+  }
+
   // ROUTE 1: Welcome Screen
   if (appStep === 'welcome') {
     return (
@@ -349,6 +370,7 @@ export function App() {
         selectedCase={selectedCase}
         onSelectCase={handleSelectCase}
         onStartCase={() => setAppStep('intake')}
+        onOpenPractice={openPractice}
       />
     );
   }
@@ -367,9 +389,11 @@ export function App() {
           setSevofluraneMac(meds.volatileMac);
           setNmbLevel(Math.min(100, meds.nmbDoseMgKg * 150));
           setSedationLevel(Math.min(100, meds.inductionDoseMgKg * 45));
+          setSimulationStartTime(performance.now());
           setAppStep('simulation');
         }}
         onBackToWelcome={() => setAppStep('welcome')}
+        onOpenPractice={openPractice}
       />
     );
   }
@@ -386,6 +410,7 @@ export function App() {
         patient={patient}
         alarmActive={alarmActive}
         setAlarmActive={setAlarmActive}
+        onOpenPractice={openPractice}
       />
 
       {/* Intraoperative Clinical Scenario Challenge Bar */}
@@ -447,6 +472,7 @@ export function App() {
         {/* UPPER SECTION (Top 55% of height / Rows 1 to 7): Real-time Waveforms */}
         <section className="h-[240px] md:h-full md:row-span-7 w-full shrink-0 min-h-0">
           <WaveformCanvas
+            startTime={simulationStartTime}
             settings={settings}
             patient={patient}
             mode={mode}
@@ -460,6 +486,7 @@ export function App() {
           {showPVLoop && (
             <div className={`order-5 md:order-none h-[180px] md:h-full ${pvColSpan} min-h-0 shrink-0`}>
               <PVLoopCanvas
+                startTime={simulationStartTime}
                 settings={settings}
                 patient={patient}
                 mode={mode}
