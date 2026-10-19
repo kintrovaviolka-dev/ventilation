@@ -3,6 +3,7 @@ import { Language, PatientCase } from '../types';
 import { PATIENT_CASES } from '../data/patientCases';
 import { TRANSLATIONS } from '../i18n/translations';
 import { playClickBeep } from '../lib/audioTone';
+import { PracticeButton } from './PracticeButton';
 
 interface WelcomeScreenProps {
   language: Language;
@@ -10,6 +11,7 @@ interface WelcomeScreenProps {
   selectedCase: PatientCase;
   onSelectCase: (c: PatientCase) => void;
   onStartCase: () => void;
+  onOpenPractice: () => void;
 }
 
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
@@ -18,6 +20,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   selectedCase,
   onSelectCase,
   onStartCase,
+  onOpenPractice,
 }) => {
   const t = TRANSLATIONS[language] || TRANSLATIONS.en;
 
@@ -42,7 +45,8 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-3 mt-2 sm:mt-0">
+        <div className="flex flex-wrap items-center gap-3 mt-2 sm:mt-0">
+          <PracticeButton language={language} onClick={onOpenPractice} />
           {/* Status Indicator */}
           <div className="bg-[#121E24] border border-cyan-500/30 px-3 py-1 rounded text-[10px] text-emerald-400 flex items-center gap-1.5 font-bold">
             <span className="w-2 h-2 rounded-full bg-emerald-400" />

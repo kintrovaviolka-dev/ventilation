@@ -1,9 +1,10 @@
 import React, { useEffect, useRef } from 'react';
 import { VentilatorSettings, PatientParams, VentMode, Language } from '../types';
 import { getInstantaneousBreath } from '../lib/waveformMath';
-import { TRANSLATIONS } from '../i18n/translations';
+import { syncCanvasSize } from '../lib/canvasSize';
 
 interface WaveformCanvasProps {
+  startTime: number;
   settings: VentilatorSettings;
   patient: PatientParams;
   mode: VentMode;
@@ -17,41 +18,34 @@ interface WaveformPoint {
 }
 
 export const WaveformCanvas: React.FC<WaveformCanvasProps> = ({
+  startTime,
   settings,
   patient,
   mode,
-  language,
 }) => {
-  const t = TRANSLATIONS[language] || TRANSLATIONS.en;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // History buffer for full sweep width
   const historyRef = useRef<WaveformPoint[]>([]);
-  const lastSweepXRef = useRef<number>(-1);
+  const lastSampleRef = useRef<number>(-1);
 
   useEffect(() => {
-    lastSweepXRef.current = -1;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
     let animationFrameId: number;
-    const startTime = performance.now();
     const sweepDurationSec = 10.0; // 10-second horizontal sweep speed (compresses curve width)
 
     const render = (now: number) => {
       const elapsedSec = (now - startTime) / 1000;
-      const rect = canvas.getBoundingClientRect();
-      const width = Math.floor(rect.width);
-      const height = Math.floor(rect.height);
+      const { width, height, dpr } = syncCanvasSize(canvas);
 
       if (width === 0 || height === 0) {
         animationFrameId = requestAnimationFrame(render);
         return;
       }
-
-      const dpr = window.devicePixelRatio || 1;
 
       // Clear full canvas buffer
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -61,65 +55,26 @@ export const WaveformCanvas: React.FC<WaveformCanvasProps> = ({
       ctx.scale(dpr, dpr);
 
       // Current exact integer X position of the sweeping beam
-      const currSweepX = Math.floor(((elapsedSec % sweepDurationSec) / sweepDurationSec) * width);
+      const sampleIndex = Math.floor((elapsedSec / sweepDurationSec) * width);
+      const currSweepX = sampleIndex % width;
 
-      // Initialize or reset buffer array if canvas size changed or first frame of a new settings run
-      if (historyRef.current.length !== width || lastSweepXRef.current === -1) {
-        const newHistory = new Array(width);
-        for (let x = 0; x < width; x++) {
-          let dx = currSweepX - x;
-          if (dx < 0) dx += width;
-          const tPast = (dx / width) * sweepDurationSec;
-          const tSim = elapsedSec - tPast;
-          const pt = getInstantaneousBreath(tSim, settings, patient, mode);
-          newHistory[x] = {
-            pressure: pt.pressure,
-            flow: pt.flow,
-            volume: pt.volume,
-          };
-        }
-        historyRef.current = newHistory;
-        lastSweepXRef.current = currSweepX;
+      if (historyRef.current.length !== width) {
+        historyRef.current = new Array<WaveformPoint>(width);
+        lastSampleRef.current = sampleIndex - width;
       }
 
       const currentBreath = getInstantaneousBreath(elapsedSec, settings, patient, mode);
 
-      // Fill history buffer across ALL intermediate pixels between last frame and this frame
-      const prevSweepX = lastSweepXRef.current;
-
-      if (prevSweepX === -1) {
-        historyRef.current[currSweepX] = {
-          pressure: currentBreath.pressure,
-          flow: currentBreath.flow,
-          volume: currentBreath.volume,
-        };
-      } else if (currSweepX >= prevSweepX) {
-        for (let x = prevSweepX; x <= currSweepX; x++) {
-          historyRef.current[x] = {
-            pressure: currentBreath.pressure,
-            flow: currentBreath.flow,
-            volume: currentBreath.volume,
-          };
-        }
-      } else {
-        // Wrapped around right edge to left edge
-        for (let x = prevSweepX; x < width; x++) {
-          historyRef.current[x] = {
-            pressure: currentBreath.pressure,
-            flow: currentBreath.flow,
-            volume: currentBreath.volume,
-          };
-        }
-        for (let x = 0; x <= currSweepX; x++) {
-          historyRef.current[x] = {
-            pressure: currentBreath.pressure,
-            flow: currentBreath.flow,
-            volume: currentBreath.volume,
-          };
-        }
+      // Sample each crossed pixel at its own time, including after a skipped sweep.
+      const firstSample = Math.max(lastSampleRef.current + 1, sampleIndex - width + 1);
+      for (let sample = firstSample; sample <= sampleIndex; sample++) {
+        const x = ((sample % width) + width) % width;
+        historyRef.current[x] = getInstantaneousBreath(
+          (sample / width) * sweepDurationSec, settings, patient, mode
+        );
       }
 
-      lastSweepXRef.current = currSweepX;
+      lastSampleRef.current = sampleIndex;
 
       // Height of each channel (3 stacked channels: Paw, Flow, Vol)
       const channelH = height / 3;
@@ -166,20 +121,6 @@ export const WaveformCanvas: React.FC<WaveformCanvasProps> = ({
         ctx.lineTo(width, zeroY);
         ctx.stroke();
         ctx.setLineDash([]);
-      }
-
-      // 3. Clear Eraser Gap Ahead of Sweep Beam
-      for (let i = 0; i < eraserWidth; i++) {
-        const eraseX = (currSweepX + i) % width;
-        ctx.fillStyle = '#060606';
-        ctx.fillRect(eraseX, 0, 1, height);
-
-        // Re-draw background grid lines over erased strip
-        ctx.strokeStyle = '#141414';
-        ctx.beginPath();
-        ctx.moveTo(eraseX, 0);
-        ctx.lineTo(eraseX, height);
-        ctx.stroke();
       }
 
       // 4. Render 3 Telemetry Channels (Paw, Flow, Volume)
@@ -247,42 +188,22 @@ export const WaveformCanvas: React.FC<WaveformCanvasProps> = ({
           }
         };
 
-        // Draw left side of sweep gap (from 0 to currSweepX)
-        if (currSweepX > 0) {
-          ctx.beginPath();
-          let started = false;
-          for (let x = 0; x <= currSweepX; x++) {
-            const pt = historyRef.current[x];
-            if (!pt) continue;
-            const y = valToY(pt[ch.key]);
-            if (!started) {
-              ctx.moveTo(x, y);
-              started = true;
-            } else {
-              ctx.lineTo(x, y);
-            }
+        // Break the trace at the eraser gap, even when it wraps over the left edge.
+        ctx.beginPath();
+        let started = false;
+        for (let x = 0; x < width; x++) {
+          const distanceAhead = (x - currSweepX + width) % width;
+          const pt = historyRef.current[x];
+          if (!pt || (distanceAhead > 0 && distanceAhead <= eraserWidth)) {
+            started = false;
+            continue;
           }
-          ctx.stroke();
+          const y = valToY(pt[ch.key]);
+          if (!started) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+          started = true;
         }
-
-        // Draw right side of sweep gap (from currSweepX + eraserWidth to width)
-        const startRightX = currSweepX + eraserWidth;
-        if (startRightX < width) {
-          ctx.beginPath();
-          let started = false;
-          for (let x = startRightX; x < width; x++) {
-            const pt = historyRef.current[x];
-            if (!pt) continue;
-            const y = valToY(pt[ch.key]);
-            if (!started) {
-              ctx.moveTo(x, y);
-              started = true;
-            } else {
-              ctx.lineTo(x, y);
-            }
-          }
-          ctx.stroke();
-        }
+        ctx.stroke();
       });
 
       // 5. Draw Sweeping Beam Vertical Line
@@ -306,33 +227,16 @@ export const WaveformCanvas: React.FC<WaveformCanvasProps> = ({
     return () => {
       cancelAnimationFrame(animationFrameId);
     };
-  }, [settings, patient, mode]);
-
-  // Handle canvas sizing
-  useEffect(() => {
-    const handleResize = () => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const rect = canvas.getBoundingClientRect();
-      const dpr = window.devicePixelRatio || 1;
-      if (rect.width > 0 && rect.height > 0) {
-        canvas.style.width = `${rect.width}px`;
-        canvas.style.height = `${rect.height}px`;
-        canvas.width = Math.floor(rect.width * dpr);
-        canvas.height = Math.floor(rect.height * dpr);
-      }
-    };
-
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  }, [
+    startTime, settings.rr, settings.vt, settings.pinsp, settings.peep,
+    settings.ieRatio, settings.pSupport, patient.compliance, patient.resistance, mode,
+  ]);
 
   return (
     <div className="relative w-full h-full bg-[#060606] border border-[#222222] rounded overflow-hidden flex flex-col select-none shadow-inner">
       <canvas
         ref={canvasRef}
-        className="w-full h-full block cursor-crosshair"
+        className="absolute inset-0 w-full h-full block cursor-crosshair"
       />
     </div>
   );

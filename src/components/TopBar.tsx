@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Activity, Languages, Bell, ShieldAlert, Cpu, ChevronDown, ChevronUp } from 'lucide-react';
 import { Language, VentMode, VentilatorSettings, PatientParams } from '../types';
 import { TRANSLATIONS } from '../i18n/translations';
+import { PracticeButton } from './PracticeButton';
 
 interface TopBarProps {
   language: Language;
@@ -11,6 +12,7 @@ interface TopBarProps {
   patient: PatientParams;
   alarmActive: boolean;
   setAlarmActive: React.Dispatch<React.SetStateAction<boolean>>;
+  onOpenPractice: () => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -21,6 +23,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   patient,
   alarmActive,
   setAlarmActive,
+  onOpenPractice,
 }) => {
   const t = TRANSLATIONS[language];
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -34,7 +37,7 @@ export const TopBar: React.FC<TopBarProps> = ({
 
   return (
     <header className="bg-[#131313] border-b border-[#2A2A2A] text-[#E5E2E1] px-4 py-2 shadow-md select-none transition-all duration-300">
-      <div className="max-w-[1920px] mx-auto flex items-center justify-between gap-3">
+      <div className="max-w-[1920px] mx-auto flex flex-wrap items-center justify-between gap-3">
         {/* Title & Brand */}
         <div className="flex items-center gap-3">
           {!isCollapsed && (
@@ -63,6 +66,7 @@ export const TopBar: React.FC<TopBarProps> = ({
 
         {/* Center Controls & Actions */}
         <div className="flex items-center gap-2 md:gap-3">
+          <PracticeButton language={language} onClick={onOpenPractice} />
           {/* Alarm Test Button - Hide on mobile if collapsed to save space */}
           {(!isCollapsed || window.innerWidth >= 768) && (
             <button

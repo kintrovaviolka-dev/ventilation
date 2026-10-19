@@ -1,9 +1,10 @@
 import React, { useEffect, useRef } from 'react';
 import { VentilatorSettings, PatientParams, VentMode, Language } from '../types';
 import { getInstantaneousBreath } from '../lib/waveformMath';
-import { TRANSLATIONS } from '../i18n/translations';
+import { syncCanvasSize } from '../lib/canvasSize';
 
 interface PVLoopCanvasProps {
+  startTime: number;
   settings: VentilatorSettings;
   patient: PatientParams;
   mode: VentMode;
@@ -16,18 +17,16 @@ interface Point2D {
 }
 
 export const PVLoopCanvas: React.FC<PVLoopCanvasProps> = ({
+  startTime,
   settings,
   patient,
   mode,
-  language,
 }) => {
-  const t = TRANSLATIONS[language] || TRANSLATIONS.en;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // Trajectory loop points
   const currentLoopRef = useRef<Point2D[]>([]);
   const previousLoopRef = useRef<Point2D[]>([]);
-  const lastPhaseRef = useRef<'insp' | 'exp'>('insp');
 
   useEffect(() => {
     // Pre-populate previous loop with a full clean cycle under the new parameters
@@ -44,7 +43,6 @@ export const PVLoopCanvas: React.FC<PVLoopCanvasProps> = ({
 
     // Clear current loop to start fresh
     currentLoopRef.current = [];
-    lastPhaseRef.current = 'insp';
 
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -52,23 +50,21 @@ export const PVLoopCanvas: React.FC<PVLoopCanvasProps> = ({
     if (!ctx) return;
 
     let animationFrameId: number;
-    const startTime = performance.now();
+    const sampleRate = 60;
+    let lastSample = -1;
+    let lastCycle = -1;
 
     const maxP = 60;   // 0 to 60 cmH2O X-axis scale
     const maxV = 800;  // 0 to 800 mL Y-axis scale
 
     const render = (now: number) => {
       const elapsedSec = (now - startTime) / 1000;
-      const rect = canvas.getBoundingClientRect();
-      const width = Math.floor(rect.width);
-      const height = Math.floor(rect.height);
+      const { width, height, dpr } = syncCanvasSize(canvas);
 
       if (width === 0 || height === 0) {
         animationFrameId = requestAnimationFrame(render);
         return;
       }
-
-      const dpr = window.devicePixelRatio || 1;
 
       // Clear full canvas buffer
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -77,23 +73,29 @@ export const PVLoopCanvas: React.FC<PVLoopCanvasProps> = ({
       ctx.save();
       ctx.scale(dpr, dpr);
 
-      // Get current instantaneous point
-      const breath = getInstantaneousBreath(elapsedSec, settings, patient, mode);
-
-      // Detect start of new breath (transition from exp to insp)
-      if (lastPhaseRef.current === 'exp' && breath.phase === 'insp') {
-        if (currentLoopRef.current.length > 5) {
-          previousLoopRef.current = [...currentLoopRef.current];
+      // Fixed-time samples keep the loop smooth and bounded on slow or hidden tabs.
+      const sampleIndex = Math.floor(elapsedSec * sampleRate);
+      const firstSample = Math.max(
+        lastSample + 1,
+        sampleIndex - Math.ceil(cycleTime * sampleRate) * 2 + 1
+      );
+      for (let sample = firstSample; sample <= sampleIndex; sample++) {
+        const time = sample / sampleRate;
+        const cycle = Math.floor(time / cycleTime);
+        if (cycle !== lastCycle) {
+          if (cycle === lastCycle + 1 && currentLoopRef.current.length > 5) {
+            previousLoopRef.current = currentLoopRef.current;
+          }
+          currentLoopRef.current = [];
+          lastCycle = cycle;
         }
-        currentLoopRef.current = [];
+        const breath = getInstantaneousBreath(time, settings, patient, mode);
+        currentLoopRef.current.push({
+          pressure: breath.pressure,
+          volume: breath.volume,
+        });
       }
-      lastPhaseRef.current = breath.phase;
-
-      // Append point to active trajectory loop
-      currentLoopRef.current.push({
-        pressure: breath.pressure,
-        volume: breath.volume,
-      });
+      lastSample = sampleIndex;
 
       // Clear Canvas inside scaled coordinate space
       ctx.fillStyle = '#060606';
@@ -234,33 +236,16 @@ export const PVLoopCanvas: React.FC<PVLoopCanvasProps> = ({
     return () => {
       cancelAnimationFrame(animationFrameId);
     };
-  }, [settings, patient, mode]);
-
-  // Handle canvas sizing
-  useEffect(() => {
-    const handleResize = () => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const rect = canvas.getBoundingClientRect();
-      const dpr = window.devicePixelRatio || 1;
-      if (rect.width > 0 && rect.height > 0) {
-        canvas.style.width = `${rect.width}px`;
-        canvas.style.height = `${rect.height}px`;
-        canvas.width = Math.floor(rect.width * dpr);
-        canvas.height = Math.floor(rect.height * dpr);
-      }
-    };
-
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  }, [
+    startTime, settings.rr, settings.vt, settings.pinsp, settings.peep,
+    settings.ieRatio, settings.pSupport, patient.compliance, patient.resistance, mode,
+  ]);
 
   return (
     <div className="relative w-full h-full bg-[#060606] border border-[#222222] rounded overflow-hidden flex flex-col select-none shadow-inner">
       <canvas
         ref={canvasRef}
-        className="w-full h-full block"
+        className="absolute inset-0 w-full h-full block"
       />
     </div>
   );
