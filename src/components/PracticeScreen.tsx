@@ -97,7 +97,7 @@ export function PracticeScreen({ language, setLanguage, onBack }: {
   };
 
   return (
-    <div className="h-screen overflow-y-auto bg-[#05080A] font-mono text-[#E5E2E1]">
+    <div className="min-h-dvh overflow-y-auto bg-[#05080A] font-mono text-[#E5E2E1]">
       <header className="sticky top-0 z-10 border-b border-[#24343E] bg-[#0B1317]/95 px-4 py-3 backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
