@@ -400,7 +400,7 @@ export function App() {
 
   // ROUTE 3: Mechanical Ventilation Simulation Screen
   return (
-    <div className="w-screen h-screen overflow-hidden bg-[#050505] text-[#E5E2E1] flex flex-col font-mono select-none">
+    <div className="w-full h-dvh overflow-hidden bg-[#050505] text-[#E5E2E1] flex flex-col font-mono select-none">
       {/* Top Anesthesia Header */}
       <TopBar
         language={language}
@@ -468,7 +468,7 @@ export function App() {
       />
 
       {/* Main Screen Layout (Optimized for Mobile Landscape and Responsive Portrait Viewports) */}
-      <main className="flex-1 p-2 md:grid md:grid-rows-12 gap-2 md:overflow-hidden overflow-y-auto max-w-[1920px] w-full mx-auto flex flex-col">
+      <main className="simulation-main min-h-0 flex-1 p-2 md:grid md:grid-rows-12 gap-2 md:overflow-hidden overflow-y-auto max-w-[1920px] w-full mx-auto flex flex-col">
         {/* UPPER SECTION (Top 55% of height / Rows 1 to 7): Real-time Waveforms */}
         <section className="h-[240px] md:h-full md:row-span-7 w-full shrink-0 min-h-0">
           <WaveformCanvas

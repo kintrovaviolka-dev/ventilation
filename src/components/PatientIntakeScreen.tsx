@@ -50,7 +50,7 @@ export const PatientIntakeScreen: React.FC<PatientIntakeScreenProps> = ({
   };
 
   return (
-    <div className="w-screen h-screen bg-[#05080A] text-[#E5E2E1] flex flex-col justify-between p-4 font-mono select-none overflow-y-auto">
+    <div className="w-full min-h-dvh bg-[#05080A] text-[#E5E2E1] flex flex-col justify-between p-4 font-mono select-none overflow-y-auto">
       {/* Top Navigation Bar */}
       <header className="w-full bg-[#0B1317] border border-[#1E293B] rounded-lg p-3 flex flex-wrap gap-3 items-center justify-between shadow-lg">
         <div className="flex items-center gap-3">

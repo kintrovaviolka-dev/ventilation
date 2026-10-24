@@ -32,3 +32,28 @@ input[type=range] {
   accent-color: #00fbfb;
 }
 
+@media (min-width: 768px) and (max-height: 820px) {
+  .simulation-main {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .simulation-main > section:first-child {
+    height: clamp(220px, 40dvh, 340px);
+    flex: 0 0 auto;
+  }
+
+  .simulation-main > section:last-child {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    min-height: 340px;
+    flex: 0 0 340px;
+  }
+
+  .simulation-main > section:last-child > div {
+    height: 100%;
+    min-height: 0;
+  }
+}
