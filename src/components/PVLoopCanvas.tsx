@@ -21,6 +21,7 @@ export const PVLoopCanvas: React.FC<PVLoopCanvasProps> = ({
   settings,
   patient,
   mode,
+  language,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -149,12 +150,12 @@ export const PVLoopCanvas: React.FC<PVLoopCanvasProps> = ({
       ctx.fillText('Paw (cmH₂O)', width - padding - 60, height - 8);
 
       ctx.fillStyle = '#10B981'; // Green text for volume Y-axis
-      ctx.fillText('Vol (mL)', padding + 4, padding - 8);
+      ctx.fillText(language === 'cs' ? 'Objem (mL)' : 'Vol (mL)', padding + 4, padding - 8);
 
       // Header Title & Compliance readout
       ctx.fillStyle = '#22D3EE';
       ctx.font = 'bold 10px monospace';
-      ctx.fillText('P-V LOOP', padding + 4, padding + 12);
+      ctx.fillText(language === 'cs' ? 'P-V SMYČKA' : 'P-V LOOP', padding + 4, padding + 12);
 
       const cStat = patient.compliance || 50;
       ctx.fillStyle = '#A1A1AA';
@@ -238,7 +239,7 @@ export const PVLoopCanvas: React.FC<PVLoopCanvasProps> = ({
     };
   }, [
     startTime, settings.rr, settings.vt, settings.pinsp, settings.peep,
-    settings.ieRatio, settings.pSupport, patient.compliance, patient.resistance, mode,
+    settings.ieRatio, settings.pSupport, patient.compliance, patient.resistance, mode, language,
   ]);
 
   return (

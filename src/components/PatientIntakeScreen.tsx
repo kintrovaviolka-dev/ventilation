@@ -1,3 +1,5 @@
+import { patientText } from '../i18n/patients';
+import { LanguageSwitcher } from './LanguageSwitcher';
 import React, { useState } from 'react';
 import { Language, PatientCase, MedicationSelection, VentilatorSettings } from '../types';
 import { TRANSLATIONS } from '../i18n/translations';
@@ -6,6 +8,7 @@ import { PracticeButton } from './PracticeButton';
 
 interface PatientIntakeScreenProps {
   language: Language;
+  setLanguage: (language: Language) => void;
   patientCase: PatientCase;
   meds: MedicationSelection;
   setMeds: React.Dispatch<React.SetStateAction<MedicationSelection>>;
@@ -18,6 +21,7 @@ interface PatientIntakeScreenProps {
 
 export const PatientIntakeScreen: React.FC<PatientIntakeScreenProps> = ({
   language,
+  setLanguage,
   patientCase,
   meds,
   setMeds,
@@ -27,7 +31,7 @@ export const PatientIntakeScreen: React.FC<PatientIntakeScreenProps> = ({
   onBackToWelcome,
   onOpenPractice,
 }) => {
-  const t = TRANSLATIONS[language] || TRANSLATIONS.en;
+  const t = TRANSLATIONS[language] || TRANSLATIONS.cs;
 
   // Calculate protective tidal volume ranges based on IBW
   const vtMinProtective = Math.round(patientCase.ibwKg * 6);
@@ -74,8 +78,9 @@ export const PatientIntakeScreen: React.FC<PatientIntakeScreenProps> = ({
         </div>
 
         <PracticeButton language={language} onClick={onOpenPractice} />
+        <LanguageSwitcher language={language} setLanguage={setLanguage} />
         <div className="text-right text-[10px] font-mono text-zinc-400">
-          Selected Patient: <strong className="text-cyan-300">{patientCase.name}</strong> ({patientCase.age}y / {patientCase.gender})
+          {language === 'cs' ? "Vybraný pacient:" : "Selected Patient:"} <strong className="text-cyan-300">{patientText(patientCase, language).name}</strong> ({patientCase.age} {language === 'cs' ? 'let' : 'years'} / {language === 'cs' ? (patientCase.gender === 'M' ? 'muž' : 'žena') : patientCase.gender})
         </div>
       </header>
 
@@ -84,7 +89,7 @@ export const PatientIntakeScreen: React.FC<PatientIntakeScreenProps> = ({
         {/* Left Column: Patient Dossier & Protective Ventilation Targets */}
         <div className="lg:col-span-5 bg-[#0B1216] border border-[#1A2830] rounded-xl p-4 flex flex-col justify-between shadow-xl">
           <div>
-            <div className="flex items-center justify-between border-b border-[#1D2E38] pb-2 mb-3">
+            <div className="flex flex-wrap gap-2 items-center justify-between border-b border-[#1D2E38] pb-2 mb-3">
               <span className="text-xs font-bold text-cyan-400 tracking-wider uppercase">
                 {t.intake.patientDetails}
               </span>
@@ -94,19 +99,19 @@ export const PatientIntakeScreen: React.FC<PatientIntakeScreenProps> = ({
             </div>
 
             <div className="space-y-2 text-xs">
-              <div className="flex justify-between items-center bg-[#101A20] p-2 rounded border border-[#1A2830]">
-                <span className="text-zinc-400">Name & Demographics:</span>
-                <span className="font-bold text-zinc-200">{patientCase.name}</span>
+              <div className="flex flex-wrap gap-2 justify-between items-center bg-[#101A20] p-2 rounded border border-[#1A2830]">
+                <span className="text-zinc-400">{language === 'cs' ? "Jméno pacienta:" : "Name & Demographics:"}</span>
+                <span className="font-bold text-zinc-200">{patientText(patientCase, language).name}</span>
               </div>
-              <div className="flex justify-between items-center bg-[#101A20] p-2 rounded border border-[#1A2830]">
-                <span className="text-zinc-400">Surgical Procedure:</span>
-                <span className="font-bold text-amber-300">{patientCase.surgery}</span>
+              <div className="flex flex-wrap gap-2 justify-between items-center bg-[#101A20] p-2 rounded border border-[#1A2830]">
+                <span className="text-zinc-400">{language === 'cs' ? "Operační výkon:" : "Surgical Procedure:"}</span>
+                <span className="font-bold text-amber-300">{patientText(patientCase, language).surgery}</span>
               </div>
-              <div className="flex justify-between items-center bg-[#101A20] p-2 rounded border border-[#1A2830]">
-                <span className="text-zinc-400">Actual Weight / Height:</span>
+              <div className="flex flex-wrap gap-2 justify-between items-center bg-[#101A20] p-2 rounded border border-[#1A2830]">
+                <span className="text-zinc-400">{language === 'cs' ? "Hmotnost / výška:" : "Actual Weight / Height:"}</span>
                 <span className="font-bold text-zinc-200">{patientCase.weightKg} kg / {patientCase.heightCm} cm</span>
               </div>
-              <div className="flex justify-between items-center bg-[#122A36] p-2 rounded border border-cyan-500/40">
+              <div className="flex flex-wrap gap-2 justify-between items-center bg-[#122A36] p-2 rounded border border-cyan-500/40">
                 <span className="text-cyan-300 font-bold">{t.intake.idealBodyWeight}:</span>
                 <span className="font-extrabold text-cyan-300 text-sm">{patientCase.ibwKg} kg</span>
               </div>
@@ -115,10 +120,10 @@ export const PatientIntakeScreen: React.FC<PatientIntakeScreenProps> = ({
             {/* Protective Ventilation Calculator Box */}
             <div className="mt-4 p-3 bg-[#0D1E27] border border-cyan-500/30 rounded-lg text-xs">
               <span className="text-cyan-400 font-bold block mb-1 uppercase tracking-wide">
-                LUNG-PROTECTIVE VENTILATION TARGET
+                {language === 'cs' ? "CÍL PROTEKTIVNÍ VENTILACE" : "LUNG-PROTECTIVE VENTILATION TARGET"}
               </span>
               <p className="text-[10px] text-zinc-300 mb-2 leading-relaxed">
-                Tidal Volume is strictly calculated on <strong>Ideal Body Weight (IBW)</strong> to prevent volutrauma and barotrauma:
+                {language === 'cs' ? "Dechový objem se počítá z ideální tělesné hmotnosti (IBW), aby se omezilo volutrauma a barotrauma:" : "Tidal volume is calculated from ideal body weight (IBW) to prevent volutrauma and barotrauma:"}
               </p>
 
               <div className="grid grid-cols-2 gap-2 text-center">
@@ -135,27 +140,27 @@ export const PatientIntakeScreen: React.FC<PatientIntakeScreenProps> = ({
           </div>
 
           <div className="mt-4 p-2.5 bg-[#091115] border border-[#1A2830] rounded text-[10px] text-zinc-400">
-            <strong className="text-zinc-200 block mb-0.5">Clinical History:</strong>
-            {patientCase.history}
+            <strong className="text-zinc-200 block mb-0.5">{language === 'cs' ? "Anamnéza:" : "Clinical History:"}</strong>
+            {patientText(patientCase, language).history}
           </div>
         </div>
 
         {/* Right Column: Medication Dose Sliders & Anesthesia Induction */}
         <div className="lg:col-span-7 bg-[#0B1216] border border-[#1A2830] rounded-xl p-4 flex flex-col justify-between shadow-xl">
           <div>
-            <div className="flex items-center justify-between border-b border-[#1D2E38] pb-2 mb-3">
+            <div className="flex flex-wrap gap-2 items-center justify-between border-b border-[#1D2E38] pb-2 mb-3">
               <span className="text-xs font-bold text-amber-400 tracking-wider uppercase">
                 {t.intake.medicationTitle}
               </span>
               <span className="text-[9px] text-emerald-400 bg-emerald-950 border border-emerald-500/40 px-2 py-0.5 rounded font-bold">
-                INDUCTION PROTOCOL
+                {language === 'cs' ? "ÚVOD DO ANESTEZIE" : "INDUCTION PROTOCOL"}
               </span>
             </div>
 
             <div className="space-y-3">
               {/* 1. Hypnotic Agent */}
               <div className="bg-[#10181D] p-3 rounded-lg border border-[#1D2E38]">
-                <div className="flex items-center justify-between mb-1.5">
+                <div className="flex flex-wrap gap-2 items-center justify-between mb-1.5">
                   <span className="text-xs font-bold text-cyan-300">
                     1. {t.intake.inductionAgent}: PROPOFOL 1%
                   </span>
@@ -165,6 +170,7 @@ export const PatientIntakeScreen: React.FC<PatientIntakeScreenProps> = ({
                 </div>
                 <input
                   type="range"
+                  aria-label="Propofol"
                   min={1.0}
                   max={2.5}
                   step={0.1}
@@ -173,15 +179,15 @@ export const PatientIntakeScreen: React.FC<PatientIntakeScreenProps> = ({
                   className="w-full accent-cyan-400 h-1.5 bg-[#1A2830] rounded cursor-pointer"
                 />
                 <div className="flex justify-between text-[9px] text-zinc-500 mt-1">
-                  <span>1.0 mg/kg (Elderly/Instable)</span>
-                  <span>2.0 mg/kg (Standard)</span>
-                  <span>2.5 mg/kg (Young)</span>
+                  <span>{language === 'cs' ? "1,0 mg/kg (starší / nestabilní)" : "1.0 mg/kg (Elderly/Instable)"}</span>
+                  <span>{language === 'cs' ? "2,0 mg/kg (standard)" : "2.0 mg/kg (Standard)"}</span>
+                  <span>{language === 'cs' ? "2,5 mg/kg (mladší)" : "2.5 mg/kg (Young)"}</span>
                 </div>
               </div>
 
               {/* 2. Opioid Analgesic */}
               <div className="bg-[#10181D] p-3 rounded-lg border border-[#1D2E38]">
-                <div className="flex items-center justify-between mb-1.5">
+                <div className="flex flex-wrap gap-2 items-center justify-between mb-1.5">
                   <span className="text-xs font-bold text-cyan-300">
                     2. {t.intake.opioid}: FENTANYL
                   </span>
@@ -191,6 +197,7 @@ export const PatientIntakeScreen: React.FC<PatientIntakeScreenProps> = ({
                 </div>
                 <input
                   type="range"
+                  aria-label="Fentanyl"
                   min={1.0}
                   max={3.0}
                   step={0.2}
@@ -200,14 +207,14 @@ export const PatientIntakeScreen: React.FC<PatientIntakeScreenProps> = ({
                 />
                 <div className="flex justify-between text-[9px] text-zinc-500 mt-1">
                   <span>1.0 mcg/kg</span>
-                  <span>2.0 mcg/kg (Intubation)</span>
+                  <span>{language === 'cs' ? "2,0 mcg/kg (intubace)" : "2.0 mcg/kg (Intubation)"}</span>
                   <span>3.0 mcg/kg</span>
                 </div>
               </div>
 
               {/* 3. Neuromuscular Blocker */}
               <div className="bg-[#10181D] p-3 rounded-lg border border-[#1D2E38]">
-                <div className="flex items-center justify-between mb-1.5">
+                <div className="flex flex-wrap gap-2 items-center justify-between mb-1.5">
                   <span className="text-xs font-bold text-cyan-300">
                     3. {t.intake.nmb}: ROCURONIUM
                   </span>
@@ -217,6 +224,7 @@ export const PatientIntakeScreen: React.FC<PatientIntakeScreenProps> = ({
                 </div>
                 <input
                   type="range"
+                  aria-label="Rokuronium"
                   min={0.6}
                   max={1.2}
                   step={0.1}
@@ -225,14 +233,14 @@ export const PatientIntakeScreen: React.FC<PatientIntakeScreenProps> = ({
                   className="w-full accent-cyan-400 h-1.5 bg-[#1A2830] rounded cursor-pointer"
                 />
                 <div className="flex justify-between text-[9px] text-zinc-500 mt-1">
-                  <span>0.6 mg/kg (Standard)</span>
-                  <span>1.0 mg/kg (RSI Intubation)</span>
+                  <span>{language === 'cs' ? "0,6 mg/kg (standard)" : "0.6 mg/kg (Standard)"}</span>
+                  <span>{language === 'cs' ? "1,0 mg/kg (RSI intubace)" : "1.0 mg/kg (RSI Intubation)"}</span>
                 </div>
               </div>
 
               {/* 4. Inhalational Anesthetic Gas */}
               <div className="bg-[#10181D] p-3 rounded-lg border border-[#1D2E38]">
-                <div className="flex items-center justify-between mb-1.5">
+                <div className="flex flex-wrap gap-2 items-center justify-between mb-1.5">
                   <span className="text-xs font-bold text-purple-300">
                     4. {t.intake.volatileGas}: SEVOFLURANE
                   </span>
@@ -242,6 +250,7 @@ export const PatientIntakeScreen: React.FC<PatientIntakeScreenProps> = ({
                 </div>
                 <input
                   type="range"
+                  aria-label="Sevofluran"
                   min={0.8}
                   max={2.0}
                   step={0.1}
@@ -253,13 +262,13 @@ export const PatientIntakeScreen: React.FC<PatientIntakeScreenProps> = ({
             </div>
 
             {/* Pharmacological Status Indicator */}
-            <div className="mt-3 bg-[#0A1C16] border border-emerald-500/40 p-2.5 rounded-lg flex items-center justify-between text-[10px] text-emerald-300 font-bold">
+            <div className="mt-3 bg-[#0A1C16] border border-emerald-500/40 p-2.5 rounded-lg flex flex-wrap gap-2 items-center justify-between text-[10px] text-emerald-300 font-bold">
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
                 <span>{t.intake.intubationReady}</span>
               </div>
               <span className="bg-emerald-950 px-2 py-0.5 rounded text-[9px] border border-emerald-500/30">
-                TOF 0/4 Twitch
+                {language === 'cs' ? "TOF 0/4 záškubů" : "TOF 0/4 Twitch"}
               </span>
             </div>
           </div>

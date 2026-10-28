@@ -364,7 +364,7 @@ export const TRANSLATIONS: Record<Language, TranslationDictionary> = {
       highRR: 'ALARM: TACHYPNOE (HIGH RESPIRATORY RATE)',
       circuitDisconnect: 'CRITICAL: BREATHING CIRCUIT DISCONNECTION',
       simulateToggle: 'Simulate Alarm',
-      silenceAlarm: 'Silence Audio (2m)',
+      silenceAlarm: 'Silence audio',
       highPriority: 'HIGH PRIORITY ALARM',
       cautionPriority: 'CAUTION / ADVISORY',
       etco2High: 'ALARM: HIGH EtCO₂ / HYPOVENTILATION',
@@ -385,7 +385,7 @@ export const TRANSLATIONS: Record<Language, TranslationDictionary> = {
     welcome: {
       title: 'ANESTEZIOLOGICKÁ STANICE CARESTATION 650',
       subtitle: 'INTEGROVANÝ SIMULÁTOR MECHANICKÉ VENTILACE',
-      systemReady: 'AUTOTEST VENTILÁTORU PROBĚHL ÚSPĚŠNĚ • SYSTÉM PRIPRAVEN',
+      systemReady: 'AUTOTEST VENTILÁTORU PROBĚHL ÚSPĚŠNĚ • SYSTÉM PŘIPRAVEN',
       startCaseBtn: 'ZAHÁJIT PŘÍPAD',
       selectCase: 'VÝBĚR KLINICKÉHO PŘÍPADU',
       ibwFormulaTip: 'Vypočítává ideální tělesnou hmotnost (IBW) pro prevenci poškození plic ventilací (VILI).',
@@ -513,7 +513,7 @@ export const TRANSLATIONS: Record<Language, TranslationDictionary> = {
       channelPlaceholder: 'Čekání na telemetrická data křivek (0.00 Hz)',
       yAxisLabel: 'Měřítko: Auto',
       xAxisLabel: 'Časové okno: 10s',
-      bufferReady: 'VYROVNÁVACÍ PAMĚŤ KŘIVKY PRIPRAVENA',
+      bufferReady: 'VYROVNÁVACÍ PAMĚŤ KŘIVKY PŘIPRAVENA',
     },
 
     console: {
@@ -577,7 +577,7 @@ export const TRANSLATIONS: Record<Language, TranslationDictionary> = {
       highRR: 'ALARM: TACHYPNOE (VYSOKÁ DECHOVÁ FREKVENCE)',
       circuitDisconnect: 'KRITICKÉ: ODPOJENÍ VENTILAČNÍHO OKRUHU',
       simulateToggle: 'Simulovat Alarm',
-      silenceAlarm: 'Utišit Audio (2m)',
+      silenceAlarm: 'Ztišit zvuk',
       highPriority: 'ALARM VYSOKÉ PRIORITY',
       cautionPriority: 'VAROVÁNÍ / UPOZORNĚNÍ',
       etco2High: 'ALARM: VYSOKÝ EtCO₂ / HYPOVENTILACE',
@@ -587,7 +587,7 @@ export const TRANSLATIONS: Record<Language, TranslationDictionary> = {
 };
 
 export function useTranslation(lang: Language) {
-  const dict = TRANSLATIONS[lang] || TRANSLATIONS.en;
+  const dict = TRANSLATIONS[lang] || TRANSLATIONS.cs;
   return {
     t: dict,
     lang,

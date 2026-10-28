@@ -84,7 +84,7 @@ export const INTRAOPERATIVE_EVENTS: IntraoperativeEvent[] = [
     title: { en: 'Acute Intraoperative Bronchospasm', cs: 'Akutní intraoperativní bronchospasmus' },
     description: {
       en: 'Sudden onset of severe airway resistance. Ppeak increases sharply; expiratory flow waveform shows severe obstruction tail.',
-      cs: 'Náhly nárůst odporu dýchacích cest. Ppeak prudce stoupá; exspirační křivka průtoku vykazuje prodloužený výdech.'
+      cs: 'Náhlý nárůst odporu dýchacích cest. Ppeak prudce stoupá; exspirační křivka průtoku vykazuje prodloužený výdech.'
     },
     compliance: -5,
     resistance: +20,
@@ -111,10 +111,10 @@ export const INTRAOPERATIVE_EVENTS: IntraoperativeEvent[] = [
   },
   {
     id: 'event_bucking',
-    title: { en: 'Patient Bucking / Light Anesthesia', cs: 'Reakce na kanylu / Melká anestezie' },
+    title: { en: 'Patient Bucking / Light Anesthesia', cs: 'Reakce na kanylu / Mělká anestezie' },
     description: {
       en: 'Neuromuscular block wearing off. Patient makes spontaneous breathing efforts against the ventilator, spiking peak airway pressure.',
-      cs: 'Odenívání svalové relaxace. Pacient dělá spontánní dechové pokusy proti ventilátoru, což způsobuje špičky tlaku.'
+      cs: 'Odeznívání svalové relaxace. Pacient dělá spontánní dechové pokusy proti ventilátoru, což způsobuje špičky tlaku.'
     },
     compliance: -10,
     resistance: +8,

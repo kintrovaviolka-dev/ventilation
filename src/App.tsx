@@ -33,7 +33,15 @@ import { TRANSLATIONS } from './i18n/translations';
 import { PracticeScreen } from './components/PracticeScreen';
 
 export function App() {
-  const [language, setLanguage] = useState<Language>('en');
+  const [language, setLanguage] = useState<Language>(() => {
+    try { return localStorage.getItem('ventilation-language-v1') === 'en' ? 'en' : 'cs'; } catch { return 'cs'; }
+  });
+  useEffect(() => {
+    document.documentElement.lang = language;
+    document.title = language === 'cs' ? 'Simulátor umělé plicní ventilace' : 'Mechanical Ventilation Simulator';
+    try { localStorage.setItem('ventilation-language-v1', language); } catch { /* Storage can be unavailable. */ }
+  }, [language]);
+  const dialPanelRef = useRef<HTMLDivElement>(null);
   const [appStep, setAppStep] = useState<AppStep>('welcome');
   const [simulationStartTime, setSimulationStartTime] = useState(0);
   const practiceOrigin = useRef<AppStep>('welcome');
@@ -223,7 +231,7 @@ export function App() {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [controlMode]);
+  }, [controlMode, activeParamIndex]);
 
   // Medication levels decay ticker
   useEffect(() => {
@@ -319,30 +327,12 @@ export function App() {
       setActiveParamIndex(idx);
       setStagedValue(getParamCurrentValue(param.id, settings, mode, patient));
       setControlMode('EDITING');
+      setTimeoutSec(7);
+      dialPanelRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }
   };
 
-  // Dynamic column spans for lower dashboard grid based on visible panels (electible choices)
-  const pvColSpan = 'md:col-span-3';
-  const medsColSpan = !showPVLoop ? 'md:col-span-3' : 'md:col-span-2';
-
-  const numericColSpan = showPVLoop && showMeds
-    ? 'md:col-span-4'
-    : !showPVLoop && showMeds
-    ? 'md:col-span-6'
-    : showPVLoop && !showMeds
-    ? 'md:col-span-6'
-    : 'md:col-span-8';
-
-  const dialColSpan = showPVLoop && showMeds
-    ? 'md:col-span-3'
-    : !showPVLoop && showMeds
-    ? 'md:col-span-3'
-    : showPVLoop && !showMeds
-    ? 'md:col-span-3'
-    : 'md:col-span-4';
-
-  const t = TRANSLATIONS[language] || TRANSLATIONS.en;
+  const t = TRANSLATIONS[language] || TRANSLATIONS.cs;
 
   const openPractice = () => {
     practiceOrigin.current = appStep;
@@ -380,6 +370,7 @@ export function App() {
     return (
       <PatientIntakeScreen
         language={language}
+        setLanguage={setLanguage}
         patientCase={selectedCase}
         meds={meds}
         setMeds={setMeds}
@@ -400,7 +391,7 @@ export function App() {
 
   // ROUTE 3: Mechanical Ventilation Simulation Screen
   return (
-    <div className="w-full h-dvh overflow-hidden bg-[#050505] text-[#E5E2E1] flex flex-col font-mono select-none">
+    <div className="w-full min-h-dvh bg-[#050505] text-[#E5E2E1] flex flex-col font-mono select-none">
       {/* Top Anesthesia Header */}
       <TopBar
         language={language}
@@ -420,7 +411,7 @@ export function App() {
         settings={settings}
         activeEvent={activeEvent}
         onSelectEvent={(ev) => setActiveEvent(ev)}
-        onBackToIntake={() => setAppStep('intake')}
+        onBackToIntake={() => { setControlMode('NAVIGATING'); setAppStep('intake'); }}
         clinicalStatusMessage={clinicalStatusMessage}
         onReconnectCircuit={() => {
           setActiveEvent(INTRAOPERATIVE_EVENTS[0]);
@@ -429,11 +420,12 @@ export function App() {
 
       {/* Workspace Panel Configuration Row (Electible Choices) */}
       <div className="bg-[#0C1216] border-b border-[#1A2830] px-4 py-1 flex flex-wrap items-center justify-between text-[10px] md:text-xs font-mono select-none gap-2">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <span className="text-[#839493] font-bold uppercase tracking-wider text-[9px] md:text-[10px]">
             {language === 'cs' ? 'ZOBRAZENÍ PANELŮ:' : 'WORKSPACE PANELS:'}
           </span>
           <button
+            aria-pressed={showPVLoop}
             onClick={() => setShowPVLoop(prev => !prev)}
             className={`px-2 py-0.5 rounded text-[9px] md:text-[10px] font-bold border transition-all cursor-pointer ${
               showPVLoop
@@ -441,9 +433,10 @@ export function App() {
                 : 'bg-zinc-900/60 text-zinc-500 border-zinc-800'
             }`}
           >
-            {showPVLoop ? '✓ P-V Loop' : '✗ P-V Loop'}
+            {showPVLoop ? '✓ ' : '✗ '}{language === 'cs' ? 'P-V smyčka' : 'P-V Loop'}
           </button>
           <button
+            aria-pressed={showMeds}
             onClick={() => setShowMeds(prev => !prev)}
             className={`px-2 py-0.5 rounded text-[9px] md:text-[10px] font-bold border transition-all cursor-pointer ${
               showMeds
@@ -451,7 +444,7 @@ export function App() {
                 : 'bg-zinc-900/60 text-zinc-500 border-zinc-800'
             }`}
           >
-            {showMeds ? '✓ Medications' : '✗ Medications'}
+            {showMeds ? '✓ ' : '✗ '}{language === 'cs' ? 'Léky' : 'Medications'}
           </button>
         </div>
         <div className="text-[8px] md:text-[9px] text-zinc-500">
@@ -468,9 +461,9 @@ export function App() {
       />
 
       {/* Main Screen Layout (Optimized for Mobile Landscape and Responsive Portrait Viewports) */}
-      <main className="simulation-main min-h-0 flex-1 p-2 md:grid md:grid-rows-12 gap-2 md:overflow-hidden overflow-y-auto max-w-[1920px] w-full mx-auto flex flex-col">
+      <main className="simulation-main p-2 sm:p-4 max-w-[1920px] w-full mx-auto">
         {/* UPPER SECTION (Top 55% of height / Rows 1 to 7): Real-time Waveforms */}
-        <section className="h-[240px] md:h-full md:row-span-7 w-full shrink-0 min-h-0">
+        <section className="waveform-panel">
           <WaveformCanvas
             startTime={simulationStartTime}
             settings={settings}
@@ -481,22 +474,9 @@ export function App() {
         </section>
 
         {/* LOWER SECTION (Bottom 45% of height / Rows 8 to 12): Split into P-V Loop, Telemetry Tiles, Medications, and GE Dial */}
-        <section className="flex flex-col md:grid md:grid-cols-12 md:row-span-5 w-full min-h-0 gap-2 shrink-0 md:shrink">
-          {/* Lower Left Quadrant: Pressure-Volume (P-V) Loop Canvas (Cols 1 to 3) */}
-          {showPVLoop && (
-            <div className={`order-5 md:order-none h-[180px] md:h-full ${pvColSpan} min-h-0 shrink-0`}>
-              <PVLoopCanvas
-                startTime={simulationStartTime}
-                settings={settings}
-                patient={patient}
-                mode={mode}
-                language={language}
-              />
-            </div>
-          )}
+        <section className="dashboard-panels">
 
-          {/* Lower Middle-Left Quadrant: Numeric Telemetry & Setting Readout Tiles (Cols 4 to 7) */}
-          <div className={`order-2 md:order-none h-auto md:h-full ${numericColSpan} min-h-[230px] shrink-0`}>
+          <div className="numeric-panel">
             <NumericTilesPanel
               physiology={physiology}
               settings={settings}
@@ -510,9 +490,24 @@ export function App() {
             />
           </div>
 
-          {/* Lower Middle-Right Quadrant: Medications & Anesthesia Panel (Cols 8 to 9) */}
+
+          <div className="dial-panel" ref={dialPanelRef}>
+            <HardwareDial
+              language={language}
+              onCancel={() => setControlMode('NAVIGATING')}
+              controlMode={controlMode}
+              activeParam={activeParam}
+              stagedValue={stagedValue}
+              liveValue={getParamCurrentValue(activeParam.id, settings, mode, patient)}
+              timeoutSec={timeoutSec}
+              timeoutWarning={timeoutWarning}
+              onTurn={handleTurn}
+              onPush={handlePush}
+            />
+          </div>
+
           {showMeds && (
-            <div className={`order-4 md:order-none h-[210px] md:h-full ${medsColSpan} min-h-0 shrink-0`}>
+            <div className="meds-panel">
               <MedicationPanel
                 language={language}
                 sevofluraneMac={sevofluraneMac}
@@ -525,19 +520,19 @@ export function App() {
             </div>
           )}
 
-          {/* Lower Right Quadrant: Hardware Simulation Control Knob (Cols 10 to 12) */}
-          <div className={`order-3 md:order-none h-[250px] md:h-full ${dialColSpan} min-h-0 shrink-0`}>
-            <HardwareDial
-              controlMode={controlMode}
-              activeParam={activeParam}
-              stagedValue={stagedValue}
-              liveValue={getParamCurrentValue(activeParam.id, settings, mode, patient)}
-              timeoutSec={timeoutSec}
-              timeoutWarning={timeoutWarning}
-              onTurn={handleTurn}
-              onPush={handlePush}
-            />
-          </div>
+
+          {showPVLoop && (
+            <div className="pv-panel">
+              <PVLoopCanvas
+                startTime={simulationStartTime}
+                settings={settings}
+                patient={patient}
+                mode={mode}
+                language={language}
+              />
+            </div>
+          )}
+
         </section>
       </main>
 

@@ -27,7 +27,7 @@ export const NumericTilesPanel: React.FC<NumericTilesPanelProps> = ({
   stagedValue,
   onSelectParam,
 }) => {
-  const t = TRANSLATIONS[language] || TRANSLATIONS.en;
+  const t = TRANSLATIONS[language] || TRANSLATIONS.cs;
 
   const [showAllReadouts, setShowAllReadouts] = React.useState(() => {
     return typeof window !== 'undefined' ? window.innerWidth >= 768 : true;
@@ -54,12 +54,12 @@ export const NumericTilesPanel: React.FC<NumericTilesPanelProps> = ({
     : measuredReadouts.filter((r) => r.isCore);
 
   return (
-    <div className="w-full h-full bg-[#080808] border border-[#222222] rounded p-2 flex flex-col justify-between select-none shadow-inner md:overflow-y-auto overflow-visible">
+    <div className="w-full h-full bg-[#080808] border border-[#222222] rounded p-2 flex flex-col justify-between select-none shadow-inner ">
       {/* 1. Measured Live Telemetry Readouts (Upper half of lower-right region) */}
       <div className="mb-2">
-        <div className="flex items-center justify-between px-1 mb-1 border-b border-[#1F1F1F] pb-0.5">
-          <span className="font-mono text-[10px] font-bold text-[#839493] uppercase flex items-center gap-1.5">
-            PATIENT VENTILATION READOUTS
+        <div className="flex flex-wrap gap-2 items-center justify-between px-1 mb-1 border-b border-[#1F1F1F] pb-0.5">
+          <span className="font-mono text-[10px] font-bold text-[#839493] uppercase flex flex-wrap items-center gap-1.5">
+            {language === 'cs' ? "NAMĚŘENÉ HODNOTY" : "PATIENT VENTILATION READOUTS"}
             <button
               onClick={() => setShowAllReadouts((prev) => !prev)}
               className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#1C1C1D] hover:bg-[#2C2C2D] text-cyan-400 transition-all border border-[#2A2A2B] cursor-pointer"
@@ -69,10 +69,10 @@ export const NumericTilesPanel: React.FC<NumericTilesPanelProps> = ({
                 : (language === 'cs' ? '▼ UKÁZAT VŠE' : '▼ SHOW ALL')}
             </button>
           </span>
-          <span className="font-mono text-[9px] text-zinc-500">LIVE SENSOR DATA</span>
+          <span className="font-mono text-[9px] text-zinc-500">{language === 'cs' ? "ŽIVÁ DATA" : "LIVE SENSOR DATA"}</span>
         </div>
 
-        <div className={`grid gap-1 ${showAllReadouts ? 'grid-cols-5' : 'grid-cols-5'}`}>
+        <div className="telemetry-grid">
           {displayedReadouts.map((tile, idx) => (
             <div
               key={idx}
@@ -81,7 +81,7 @@ export const NumericTilesPanel: React.FC<NumericTilesPanelProps> = ({
               <span className="font-mono text-[9px] text-zinc-400 uppercase tracking-tight">
                 {tile.label}
               </span>
-              <div className="flex items-baseline justify-between mt-0.5">
+              <div className="flex flex-wrap gap-1 items-baseline justify-between mt-0.5">
                 <span className={`font-mono text-sm sm:text-base font-extrabold ${tile.color}`}>
                   {tile.val}
                 </span>
@@ -98,14 +98,14 @@ export const NumericTilesPanel: React.FC<NumericTilesPanelProps> = ({
 
       {/* 2. Interactive Ventilator Control Setting Tiles (Lower half of lower-right region) */}
       <div>
-        <div className="flex items-center justify-between px-1 mb-1 border-b border-[#1F1F1F] pb-0.5">
+        <div className="flex flex-wrap gap-2 items-center justify-between px-1 mb-1 border-b border-[#1F1F1F] pb-0.5">
           <span className="font-mono text-[10px] font-bold text-cyan-400 uppercase">
-            VENTILATOR CONTROL SETTINGS (DIAL TARGETS)
+            {language === 'cs' ? "NASTAVENÍ VENTILÁTORU" : "VENTILATOR CONTROL SETTINGS (DIAL TARGETS)"}
           </span>
-          <span className="font-mono text-[9px] text-amber-400">TURN/PUSH DIAL TO EDIT</span>
+          <span className="font-mono text-[9px] text-amber-400">{language === 'cs' ? "VYBERTE PARAMETR" : "TURN/PUSH DIAL TO EDIT"}</span>
         </div>
 
-        <div className="grid grid-cols-4 gap-1.5">
+        <div className="settings-grid">
           {SELECTABLE_PARAMETERS.map((param) => {
             const isSelected = activeParam.id === param.id;
             const isEditingThis = isSelected && controlMode === 'EDITING';
@@ -124,7 +124,7 @@ export const NumericTilesPanel: React.FC<NumericTilesPanelProps> = ({
                 }`}
               >
                 {/* Tile Header */}
-                <div className="flex items-center justify-between w-full">
+                <div className="flex flex-wrap gap-2 items-center justify-between w-full">
                   <span
                     className={`font-mono text-[9px] font-bold uppercase truncate ${
                       isEditingThis
@@ -134,18 +134,18 @@ export const NumericTilesPanel: React.FC<NumericTilesPanelProps> = ({
                         : 'text-zinc-400'
                     }`}
                   >
-                    {param.shortLabel}
+                    {param.id === 'mode' && language === 'cs' ? 'REŽIM' : param.shortLabel}
                   </span>
 
                   {isEditingThis && (
                     <span className="bg-amber-500 text-black font-mono font-bold text-[8px] px-1 rounded animate-ping">
-                      EDIT
+                      {language === 'cs' ? "ÚPRAVA" : "EDIT"}
                     </span>
                   )}
                 </div>
 
                 {/* Tile Values Display */}
-                <div className="mt-1 flex items-baseline justify-between w-full">
+                <div className="mt-1 flex flex-wrap gap-1 items-baseline justify-between w-full">
                   {isEditingThis ? (
                     <div className="flex items-baseline gap-1">
                       <span className="font-mono text-[10px] text-zinc-500 line-through">

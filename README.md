@@ -14,8 +14,16 @@ An interactive, high-fidelity mechanical ventilation simulator designed for crit
   - Circuit Disconnection (Immediate volume/pressure loss)
 - **Interactive Anesthesia & Medications Panel**: Manage gas vaporizers (Sevoflurane) and intravenous drug boluses (Rocuronium NMB, Propofol, Fentanyl) with realistic muscle block decay and Train-of-Four (TOF) telemetry.
 - **Auditory Clinical Alarms**: High-fidelity synthesized alarm sound loops for critical and caution states with a functional alarm-silence feature.
-- **Dual Language Support**: English (EN) and Czech (CS) languages.
+- **Jazyk / Language**: Čeština je výchozí jazyk. Přepínač Čeština / English je na všech obrazovkách a volba se ukládá v prohlížeči. Czech is the default; English is available on every screen.
 - **Parameter Practice**: The header's **Practice / Procvičování** button opens a separate bilingual exercise screen with 720 shuffled fictional adult profiles, numeric inputs and plus/minus controls, deterministic feedback, and optional propofol/rocuronium questions. Profiles do not repeat within a deck. Opening practice pauses simulation medication decay and alarms; returning preserves settings and resumes the simulation clock.
+
+## Ovládání a rozložení
+
+- Stránka se posouvá jako celek; panely se na mobilu řadí pod sebe a na větších obrazovkách vedle sebe. Výška panelů se přizpůsobuje obsahu.
+- Vyberte parametr, upravte jej pomocí − / + a potvrďte. Rozpracovanou změnu lze zrušit tlačítkem; po 7 sekundách nečinnosti se zruší automaticky.
+- Ovladač podporuje tažení myší i dotykem, šipky, Enter / mezerník a Escape. Samotné tažení změnu nepotvrdí.
+- Poměr I:E lze nastavit přímo mezi parametry. Model pacienta určuje vybraný klinický případ.
+- Volitelné panely P-V smyčky a léků lze skrýt.
 
 ## Practice rules and limitations
 

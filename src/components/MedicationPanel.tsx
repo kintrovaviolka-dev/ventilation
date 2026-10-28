@@ -23,7 +23,7 @@ export const MedicationPanel: React.FC<MedicationPanelProps> = ({
   sedationLevel,
   administerSedative,
 }) => {
-  const t = TRANSLATIONS[language] || TRANSLATIONS.en;
+  const t = TRANSLATIONS[language] || TRANSLATIONS.cs;
 
   // Determine Train-of-Four twitches based on NMB Level
   let tofTwitches = '4/4';
@@ -63,22 +63,22 @@ export const MedicationPanel: React.FC<MedicationPanelProps> = ({
   };
 
   return (
-    <div className="w-full h-full bg-[#080808] border border-[#222222] rounded p-2 flex flex-col justify-between select-none shadow-inner md:overflow-y-auto overflow-hidden">
+    <div className="w-full h-full bg-[#080808] border border-[#222222] rounded p-2 flex flex-col justify-between select-none shadow-inner ">
       {/* Panel Title */}
       <div className="mb-2">
-        <div className="flex items-center justify-between px-1 mb-1 border-b border-[#1F1F1F] pb-0.5">
+        <div className="flex flex-wrap gap-2 items-center justify-between px-1 mb-1 border-b border-[#1F1F1F] pb-0.5">
           <span className="font-mono text-[10px] font-bold text-purple-400 uppercase tracking-wider flex items-center gap-1">
             <Syringe className="w-3.5 h-3.5" />
             {language === 'cs' ? 'ANESTEZIE & FARMAKOTERAPIE' : 'ANESTHESIA & MEDICATIONS'}
           </span>
-          <span className="font-mono text-[9px] text-zinc-500">BOLUS & VAPORIZER</span>
+          <span className="font-mono text-[9px] text-zinc-500">{language === 'cs' ? "BOLUS A ODPAŘOVAČ" : "BOLUS & VAPORIZER"}</span>
         </div>
       </div>
 
       <div className="flex-1 flex flex-col gap-2.5">
         {/* 1. Sevoflurane Vaporizer Control */}
         <div className="bg-[#121212] border border-purple-500/20 rounded p-2 flex flex-col gap-1">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap gap-2 items-center justify-between">
             <div className="flex items-center gap-1">
               <Flame className="w-3 h-3 text-purple-400" />
               <span className="text-[10px] font-mono font-bold text-zinc-200">
@@ -93,6 +93,7 @@ export const MedicationPanel: React.FC<MedicationPanelProps> = ({
           <div className="flex items-center gap-2">
             <input
               type="range"
+                  aria-label="Sevofluran"
               min={0.0}
               max={2.0}
               step={0.1}
@@ -115,7 +116,7 @@ export const MedicationPanel: React.FC<MedicationPanelProps> = ({
 
         {/* 2. Neuromuscular Blocker (Rocuronium) */}
         <div className="bg-[#121212] border border-emerald-500/20 rounded p-2 flex flex-col gap-1.5">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap gap-2 items-center justify-between">
             <span className="text-[10px] font-mono font-bold text-zinc-200 flex items-center gap-1">
               <Shield className="w-3 h-3 text-emerald-400" />
               {language === 'cs' ? 'Svalová relaxace (NMB)' : 'NMB Block (Rocuronium)'}
@@ -138,8 +139,8 @@ export const MedicationPanel: React.FC<MedicationPanelProps> = ({
             </span>
           </div>
 
-          <div className="flex justify-between items-center mt-1">
-            <span className="text-[8px] font-mono text-zinc-500 truncate max-w-[100px]">
+          <div className="flex flex-wrap gap-2 justify-between items-center mt-1">
+            <span className="text-[8px] font-mono text-zinc-500 ">
               {statusText}
             </span>
             <button
@@ -153,7 +154,7 @@ export const MedicationPanel: React.FC<MedicationPanelProps> = ({
 
         {/* 3. Sedative (Propofol) & Analgesic (Fentanyl) */}
         <div className="bg-[#121212] border border-cyan-500/20 rounded p-2 flex flex-col gap-1.5">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap gap-2 items-center justify-between">
             <span className="text-[10px] font-mono font-bold text-zinc-200 flex items-center gap-1">
               <Activity className="w-3 h-3 text-cyan-400" />
               {language === 'cs' ? 'Hloubka sedace / analgezie' : 'Sedation / Analgesia'}
@@ -181,7 +182,7 @@ export const MedicationPanel: React.FC<MedicationPanelProps> = ({
               onClick={handleSedativeBolus}
               className="px-2 py-0.5 bg-cyan-950 hover:bg-cyan-900 border border-cyan-500/40 hover:border-cyan-400 text-cyan-300 font-mono text-[9px] font-bold rounded active:scale-95 transition-all"
             >
-              + SEDATIVE
+              {language === 'cs' ? "+ SEDATIVUM" : "+ SEDATIVE"}
             </button>
           </div>
         </div>

@@ -17,7 +17,7 @@ export const AlarmBanner: React.FC<AlarmBannerProps> = ({
   isSilenced,
   onSilenceToggle,
 }) => {
-  const t = TRANSLATIONS[language] || TRANSLATIONS.en;
+  const t = TRANSLATIONS[language] || TRANSLATIONS.cs;
 
   // If no alarms are active, do not render banner (clears automatically)
   if (!alarms || alarms.length === 0) {
@@ -43,7 +43,7 @@ export const AlarmBanner: React.FC<AlarmBannerProps> = ({
 
   return (
     <div
-      className={`w-full border-b-2 px-4 py-2 flex items-center justify-between select-none z-50 transition-colors duration-300 ${bgStyles}`}
+      className={`w-full border-b-2 px-4 py-2 flex flex-wrap gap-2 items-center justify-between select-none z-50 transition-colors duration-300 ${bgStyles}`}
     >
       <div className="flex items-center gap-3 overflow-hidden">
         <div className="p-1 bg-black/30 rounded shrink-0">
@@ -61,7 +61,7 @@ export const AlarmBanner: React.FC<AlarmBannerProps> = ({
             {levelLabel}
           </span>
 
-          <span className="font-mono text-sm font-bold tracking-tight truncate">
+          <span className="font-mono text-sm font-bold tracking-tight">
             {primaryAlarm.message}
           </span>
 
@@ -71,7 +71,7 @@ export const AlarmBanner: React.FC<AlarmBannerProps> = ({
 
           {totalAlarms > 1 && (
             <span className="font-mono text-xs font-bold bg-black/60 text-white px-2 py-0.5 rounded border border-white/30 shrink-0">
-              +{totalAlarms - 1} MORE
+              +{totalAlarms - 1} {language === 'cs' ? 'DALŠÍ' : 'MORE'}
             </span>
           )}
         </div>
@@ -89,7 +89,7 @@ export const AlarmBanner: React.FC<AlarmBannerProps> = ({
           {isSilenced ? (
             <>
               <VolumeX className="w-3.5 h-3.5 text-yellow-400" />
-              <span>MUTED (2m)</span>
+              <span>{language === 'cs' ? "ZTIŠENO" : "MUTED (2m)"}</span>
             </>
           ) : (
             <>

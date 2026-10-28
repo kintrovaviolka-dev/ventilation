@@ -1,3 +1,4 @@
+import { LanguageSwitcher } from './LanguageSwitcher';
 import { useRef, useState } from 'react';
 import { ArrowLeft, Check, ChevronRight, GraduationCap, Minus, Plus, RotateCcw } from 'lucide-react';
 import { Language } from '../types';
@@ -109,9 +110,7 @@ export function PracticeScreen({ language, setLanguage, onBack }: {
           </div>
           <div className="flex items-center gap-3 text-xs">
             <span className="text-zinc-400">{t.progress} {session.index + 1} {t.of} {session.deck.length}</span>
-            <button type="button" onClick={() => setLanguage(language === 'cs' ? 'en' : 'cs')} className="rounded border border-[#344751] px-2 py-1 text-cyan-300">
-              {language === 'cs' ? 'EN' : 'CS'}
-            </button>
+            <LanguageSwitcher language={language} setLanguage={setLanguage} />
           </div>
         </div>
       </header>

@@ -1,3 +1,4 @@
+import { patientText } from '../i18n/patients';
 import React, { useState } from 'react';
 import { Language, PatientCase, IntraoperativeEvent, VentilatorSettings, PatientParams } from '../types';
 import { INTRAOPERATIVE_EVENTS } from '../data/patientCases';
@@ -25,7 +26,7 @@ export const ClinicalScenarioBar: React.FC<ClinicalScenarioBarProps> = ({
   clinicalStatusMessage,
   onReconnectCircuit,
 }) => {
-  const t = TRANSLATIONS[language] || TRANSLATIONS.en;
+  const t = TRANSLATIONS[language] || TRANSLATIONS.cs;
   const [showTip, setShowTip] = useState<boolean>(true);
 
   // Calculate current Vt per IBW ratio
@@ -35,7 +36,7 @@ export const ClinicalScenarioBar: React.FC<ClinicalScenarioBarProps> = ({
   return (
     <div className="w-full bg-[#081014] border-b border-[#1C2C36] px-3 py-1.5 flex flex-wrap items-center justify-between text-xs font-mono select-none gap-2">
       {/* Left Section: Active Patient Brief & Protective Ratio Badge */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <button
           onClick={() => {
             playClickBeep();
@@ -43,11 +44,11 @@ export const ClinicalScenarioBar: React.FC<ClinicalScenarioBarProps> = ({
           }}
           className="bg-[#12222B] hover:bg-[#1A2E3A] border border-cyan-500/40 text-cyan-300 text-[10px] font-bold px-2 py-0.5 rounded transition-all flex items-center gap-1"
         >
-          ← {patientCase.name} ({patientCase.ibwKg}kg IBW)
+          ← {patientText(patientCase, language).name} ({patientCase.ibwKg}kg IBW)
         </button>
 
-        <div className="flex items-center gap-1.5 text-[10px]">
-          <span className="text-zinc-400">Target VT:</span>
+        <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+          <span className="text-zinc-400">{language === 'cs' ? "Cílový VT:" : "Target VT:"}</span>
           <span
             className={`font-extrabold px-1.5 py-0.5 rounded border ${
               isProtective
@@ -59,16 +60,16 @@ export const ClinicalScenarioBar: React.FC<ClinicalScenarioBarProps> = ({
           </span>
           {!isProtective && (
             <span className="text-[9px] text-amber-400 font-bold hidden sm:inline">
-              ⚠ Aim for 6-8 mL/kg IBW ({Math.round(patientCase.ibwKg * 6)}-{Math.round(patientCase.ibwKg * 8)} mL)
+              {language === 'cs' ? "⚠ Cíl 6–8 mL/kg IBW" : "⚠ Aim for 6-8 mL/kg IBW"} ({Math.round(patientCase.ibwKg * 6)}-{Math.round(patientCase.ibwKg * 8)} mL)
             </span>
           )}
         </div>
       </div>
 
       {/* Center Section: Intraoperative Event Selector Buttons */}
-      <div className="flex items-center gap-1 overflow-x-auto py-0.5">
+      <div className="flex flex-wrap items-center gap-1 py-0.5">
         <span className="text-[9px] text-zinc-500 font-bold uppercase mr-1 hidden md:inline">
-          CLINICAL SCENARIO:
+          {language === 'cs' ? "KLINICKÝ SCÉNÁŘ:" : "CLINICAL SCENARIO:"}
         </span>
         {INTRAOPERATIVE_EVENTS.map((ev) => {
           const isSelected = ev.id === activeEvent.id;
@@ -80,7 +81,7 @@ export const ClinicalScenarioBar: React.FC<ClinicalScenarioBarProps> = ({
                 onSelectEvent(ev);
                 setShowTip(true);
               }}
-              className={`px-2 py-1 rounded text-[9px] font-bold border transition-all whitespace-nowrap ${
+              className={`px-2 py-1 rounded text-[9px] font-bold border transition-all text-left ${
                 isSelected
                   ? ev.severity === 'critical'
                     ? 'bg-red-950 text-red-300 border-red-500 ring-1 ring-red-400 animate-pulse'

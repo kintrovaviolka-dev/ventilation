@@ -92,13 +92,13 @@ export const SELECTABLE_PARAMETERS: ParameterSpec[] = [
     options: ['vc', 'pc', 'simv', 'ps'],
   },
   {
-    id: 'preset',
-    label: 'Patient Lung Model',
-    shortLabel: 'MODEL',
+    id: 'ieRatio',
+    label: 'I:E Ratio',
+    shortLabel: 'I:E',
     unit: '',
     color: 'primary',
-    category: 'patient',
-    options: ['normal', 'ards', 'copd', 'restrictive'],
+    category: 'settings',
+    options: ['1:1', '1:2', '1:3', '1:4'],
   },
 ];
 
@@ -123,8 +123,8 @@ export function getParamCurrentValue(
       return settings.pSupport;
     case 'mode':
       return mode;
-    case 'preset':
-      return patient.preset;
+    case 'ieRatio':
+      return settings.ieRatio;
     default:
       return 0;
   }

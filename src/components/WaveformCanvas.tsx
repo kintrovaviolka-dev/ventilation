@@ -22,6 +22,7 @@ export const WaveformCanvas: React.FC<WaveformCanvasProps> = ({
   settings,
   patient,
   mode,
+  language,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -140,7 +141,7 @@ export const WaveformCanvas: React.FC<WaveformCanvasProps> = ({
           min: -120,
           max: 120,
           zeroRatio: 0.5,
-          label: 'Flow (L/min)',
+          label: language === 'cs' ? 'Průtok (L/min)' : 'Flow (L/min)',
           value: `${currentBreath.flow > 0 ? '+' : ''}${currentBreath.flow.toFixed(0)}`,
         },
         {
@@ -149,7 +150,7 @@ export const WaveformCanvas: React.FC<WaveformCanvasProps> = ({
           min: 0,
           max: 800,
           zeroRatio: 0.82,
-          label: 'Vol (mL)',
+          label: language === 'cs' ? 'Objem (mL)' : 'Vol (mL)',
           value: `${currentBreath.volume.toFixed(0)}`,
         },
       ];
@@ -229,7 +230,7 @@ export const WaveformCanvas: React.FC<WaveformCanvasProps> = ({
     };
   }, [
     startTime, settings.rr, settings.vt, settings.pinsp, settings.peep,
-    settings.ieRatio, settings.pSupport, patient.compliance, patient.resistance, mode,
+    settings.ieRatio, settings.pSupport, patient.compliance, patient.resistance, mode, language,
   ]);
 
   return (
