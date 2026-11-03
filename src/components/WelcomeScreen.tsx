@@ -59,6 +59,13 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
         </div>
       </header>
 
+      <aside className="device-recommendation">
+        <strong>{language === 'cs' ? 'Nejlépe na tabletu nebo počítači' : 'Best on a tablet or computer'}</strong>
+        <p>{language === 'cs'
+          ? 'Simulátor funguje i na telefonu. Pro přehledné křivky, oba monitory a pohodlné ovládání ale doporučujeme tablet nebo počítač.'
+          : 'The simulator also works on a phone. For clearer waveforms, both monitors and easier controls, we recommend a tablet or computer.'}</p>
+      </aside>
+
       {/* Main Center Content: Clinical Case Selector & Station Check */}
       <main className="my-auto py-4 max-w-5xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Left Column: Station Telemetry & Machine Check */}
@@ -66,7 +73,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
           <div>
             <div className="flex flex-wrap gap-2 items-center justify-between border-b border-[#1D2E38] pb-2 mb-3">
               <span className="text-xs font-bold text-cyan-400 tracking-wider uppercase">
-                {language === 'cs' ? "AUTOTEST GE CARESTATION" : "GE CARESTATION SELF-CHECK"}
+                {language === 'cs' ? "MODELOVÝ AUTOTEST" : "MODEL SELF-CHECK"}
               </span>
               <span className="text-[9px] bg-emerald-950 text-emerald-400 border border-emerald-500/40 px-1.5 py-0.5 rounded font-bold">
                 {language === 'cs' ? "V POŘÁDKU" : "PASSED"}

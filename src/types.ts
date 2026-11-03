@@ -11,6 +11,17 @@ export interface VentilatorSettings {
   pinsp: number;      // Inspiratory Pressure 10-40 cmH2O (for PC)
   peep: number;       // PEEP 0-20 cmH2O
   ieRatio: string;    // I:E Ratio ("1:1", "1:1.5", "1:2", "1:2.5", "1:3", "1:4")
+  flowTrigger?: number;
+  cycleOff?: number;
+  minTi?: number;
+  maxTi?: number;
+  apneaSeconds?: number;
+  backupEnabled?: number; // 0/1 for shared numeric/dial editing
+  backupPinsp?: number;
+  backupRr?: number;
+  backupIeRatio?: string;
+  spontaneousRate?: number;
+  driveAmplitude?: number;
   pSupport: number;   // Pressure Support 0-30 cmH2O (for PS / SIMV)
 }
 
@@ -19,6 +30,7 @@ export type PatientPreset = 'normal' | 'ards' | 'copd' | 'restrictive' | 'custom
 export interface PatientParams {
   compliance: number; // mL/cmH2O (10-100)
   resistance: number; // cmH2O/L/s (2-50)
+  spontaneousDrive: number; // Inspiratory effort in cmH2O
   preset: PatientPreset;
 }
 

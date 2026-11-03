@@ -12,6 +12,7 @@ interface ClinicalScenarioBarProps {
   activeEvent: IntraoperativeEvent;
   onSelectEvent: (event: IntraoperativeEvent) => void;
   onBackToIntake: () => void;
+  crisisActive?: boolean;
   clinicalStatusMessage?: string;
   onReconnectCircuit?: () => void;
 }
@@ -23,6 +24,7 @@ export const ClinicalScenarioBar: React.FC<ClinicalScenarioBarProps> = ({
   activeEvent,
   onSelectEvent,
   onBackToIntake,
+  crisisActive = false,
   clinicalStatusMessage,
   onReconnectCircuit,
 }) => {
@@ -76,6 +78,7 @@ export const ClinicalScenarioBar: React.FC<ClinicalScenarioBarProps> = ({
           return (
             <button
               key={ev.id}
+              disabled={crisisActive}
               onClick={() => {
                 playClickBeep();
                 onSelectEvent(ev);
@@ -89,7 +92,7 @@ export const ClinicalScenarioBar: React.FC<ClinicalScenarioBarProps> = ({
                     ? 'bg-amber-950 text-amber-300 border-amber-500 ring-1 ring-amber-400'
                     : 'bg-cyan-950 text-cyan-300 border-cyan-400 ring-1 ring-cyan-400'
                   : 'bg-[#0E181F] text-zinc-400 border-[#1C2C36] hover:bg-[#15232D] hover:text-zinc-200'
-              }`}
+              } ${crisisActive ? 'cursor-not-allowed opacity-45' : ''}`}
             >
               {ev.title[language] || ev.title.en}
             </button>

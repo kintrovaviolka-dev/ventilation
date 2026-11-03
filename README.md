@@ -1,29 +1,24 @@
 # Mechanical Ventilation Simulator
 
-An interactive, high-fidelity mechanical ventilation simulator designed for critical care education, anesthesia training, and clinical practice simulation. It features real-time telemetry waveforms, dynamic compliance modeling, a physical-style control dial, and closed-loop pharmacological simulation.
+Bilingual educational anesthesia and ventilation simulator. It uses a simplified deterministic single-compartment model and original SVG/CSS equipment illustrations. It is not a validated medical device or an exact emulation of a GE station.
 
-## Features
+## Runtime and monitoring
 
-- **Real-Time Telemetry Waveforms**: Interactive canvas plotting airway pressure ($P_{aw}$), flow rate, and lung volume. Waveforms and the P-V loop share a continuous simulation clock, without restarting on routine value updates, and resize with their panels.
-- **Pressure-Volume (P-V) Loop**: Dynamic loops showing static compliance reference curves and compliance shifts in real time.
-- **Clinical Scenarios**: Realistic patient models and intraoperative challenges:
-  - Stable Baseline
-  - Acute Intraoperative Bronchospasm (High airway resistance)
-  - Pneumoperitoneum / Lung Atelectasis (Reduced lung compliance)
-  - Patient Bucking / Light Anesthesia (Spontaneous respiratory effort)
-  - Circuit Disconnection (Immediate volume/pressure loss)
-- **Interactive Anesthesia & Medications Panel**: Manage gas vaporizers (Sevoflurane) and intravenous drug boluses (Rocuronium NMB, Propofol, Fentanyl) with realistic muscle block decay and Train-of-Four (TOF) telemetry.
-- **Auditory Clinical Alarms**: High-fidelity synthesized alarm sound loops for critical and caution states with a functional alarm-silence feature.
-- **Jazyk / Language**: Čeština je výchozí jazyk. Přepínač Čeština / English je na všech obrazovkách a volba se ukládá v prohlížeči. Czech is the default; English is available on every screen.
-- **Parameter Practice**: The header's **Practice / Procvičování** button opens a separate bilingual exercise screen with 720 shuffled fictional adult profiles, numeric inputs and plus/minus controls, deterministic feedback, and optional propofol/rocuronium questions. Profiles do not repeat within a deck. Opening practice pauses simulation medication decay and alarms; returning preserves settings and resumes the simulation clock.
+One `advanceSimulation(state, commands, elapsedMs)` runtime advances mechanics, cardiac phase, medication events, fluids and guided scenarios in fixed 5 ms steps. Canvases draw recorded samples. Volume is conserved across breaths; proximal airway pressure, elastic pressure and muscle effort are distinct. Readouts use the latest completed breath (including breath-derived RR and minute ventilation) and show “—” before data exists. The OR display shows only Paw, flow and CO2 with large held Ppeak/MVe/EtCO2 values; CO2 is displayed in kPa. Advanced model telemetry stays in a separate collapsed disclosure. The upper monitor pairs ECG/HR and pulse-ox SpO2 with saturation and NIBP. All active alarms remain visible; audio mute lasts 120 simulation seconds. Plateau pressure is a model estimate, unavailable with spontaneous effort. Auto-PEEP, total PEEP and trapped volume are separate. P-V history stores the actual preceding breath.
 
-## Ovládání a rozložení
+VC and PC deliver timed mandatory breaths. PSV requires patient effort and a flow trigger, then cycles at a fraction of peak inspiratory flow within Ti bounds. SIMV combines synchronized mandatory VC breaths and supported spontaneous breaths. Apnea raises an alarm and uses separately configured PC backup, enabled by default; it can be disabled for teaching. Principles follow [Hamilton's mode descriptions](https://www.hamilton-medical.com/en_DK/Products/Compare/Compare-ventilation-modes.html); numerical defaults are simulator choices, not treatment prescriptions.
 
-- Stránka se posouvá jako celek; panely se na mobilu řadí pod sebe a na větších obrazovkách vedle sebe. Výška panelů se přizpůsobuje obsahu.
-- Vyberte parametr, upravte jej pomocí − / + a potvrďte. Rozpracovanou změnu lze zrušit tlačítkem; po 7 sekundách nečinnosti se zruší automaticky.
-- Ovladač podporuje tažení myší i dotykem, šipky, Enter / mezerník a Escape. Samotné tažení změnu nepotvrdí.
-- Poměr I:E lze nastavit přímo mezi parametry. Model pacienta určuje vybraný klinický případ.
-- Volitelné panely P-V smyčky a léků lze skrýt.
+## Ovládání / Controls
+
+- Výchozí je číselné zadávání. Potvrďte tlačítkem Použít nebo Enter; Escape zruší rozpracovanou změnu. Volitelné kolečko zachovává tažení, šipky, potvrzení a sedmisekundový timeout. Volba editoru a CZ/EN se ukládá v prohlížeči.
+- Potvrzené ventilační nastavení se uplatní při dalším nádechu; panel ukazuje čekající hodnoty. Úsilí a spontánní frekvence jsou vlastnosti pacienta a mění se ihned. Lékové události, změny infuzí a odpojení okruhu nečekají na nádech.
+- Příjem i šuplík používají absolutní dávky propofolu, sufentanilu, rokuronia, noradrenalinu a atropinu. Potvrzení příjmu založí události jednou v čase 00:00. Sedace a svalový blok jsou různé účinky; relaxace nezajišťuje bezvědomí. Sevofluran se nastavuje samostatně a skládá se ve společném modelu.
+- Šuplík **Léky / Tekutiny**: výběr balení nepodává látku. Detail vyžaduje samostatné potvrzení. Balancovaný krystaloid a NaCl 0,9 % mají vak, cílový objem a rychlost mL/h; podporují pauzu, změnu rychlosti, obnovení a definitivní ukončení. Změna rychlosti během pauzy infuzi neobnoví. Přehled a zastavení jsou dostupné i mimo šuplík.
+- Celkem podané tekutiny nejsou čistá bilance. U hypovolémie působí skutečný objem podaný po začátku scénáře plynule podle ilustrativní odezvy `0.75 × V/(V+500 mL)`. Ruční dokončení scénáře nenormalizuje oběh, nezastaví krvácení ani běžící infuzi. Elektrolyty, acidobazická rovnováha, renální eliminace a přetížení zatím nejsou modelovány.
+- Řízené scénáře a demonstrace mechaniky se nespouštějí současně. Oba monitory lze samostatně zakrýt. Panely P-V a anestezie lze skrýt.
+- Procvičování pozastaví celý runtime a po návratu zachová jeho stav. Skrytá záložka se také pozastaví; po návratu se objeví oznámení. Procvičování má vlastní oddělenou hodnoticí metodiku popsanou níže.
+
+Implementation status, checks, known limits and takeover instructions: [repair plan](docs/SIMULATION_REPAIR_PLAN.md), [engine handoff](docs/PHYSIOLOGY_ENGINE_HANDOFF.md). Clinical review is pending separately from software verification.
 
 ## Practice rules and limitations
 
@@ -87,3 +82,7 @@ This project is fully ready for deployment as a static site.
 - **Styling**: Tailwind CSS v4
 - **Graphics**: HTML5 Canvas (optimized with `requestAnimationFrame`)
 - **Audio**: Web Audio API (real-time synthesizer)
+
+## Audit 1. listopadu 2026
+
+Technické opravy, nové ovládání, ověření a otevřené limity fyziologického modelu popisuje [audit](docs/PHYSIOLOGY_UI_AUDIT.md).

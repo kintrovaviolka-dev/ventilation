@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { RotateCw, Check, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Language } from '../types';
 import { TRANSLATIONS } from '../i18n/translations';
-import { ControlMode, ParameterSpec } from '../lib/controlSystem';
+import { CZECH_PARAMETER_LABELS, ControlMode, ParameterSpec } from '../lib/controlSystem';
 import { playDialTick, playConfirmChime, playCancelBeep } from '../lib/audioTone';
 
 interface HardwareDialProps {
@@ -76,7 +76,7 @@ export const HardwareDial: React.FC<HardwareDialProps> = ({
         <div className="flex items-center gap-1.5">
           <RotateCw className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
           <span className="font-mono text-[11px] font-bold text-cyan-300 tracking-wider uppercase">
-            {language === 'cs' ? "OTOČNÝ OVLADAČ" : "GE CONTROL KNOB"}
+            {language === 'cs' ? "OTOČNÝ OVLADAČ" : "ROTARY CONTROL"}
           </span>
         </div>
 
@@ -102,7 +102,7 @@ export const HardwareDial: React.FC<HardwareDialProps> = ({
       {/* Selected Parameter Status Box */}
       <div className="w-full bg-[#141414] border border-[#2A2A2A] rounded p-2 flex flex-col items-center justify-center gap-0.5 my-1 text-center">
         <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-wide">
-          {labels[activeParam.id] || activeParam.label}
+          {labels[activeParam.id] || (language==='cs' ? CZECH_PARAMETER_LABELS[activeParam.id] : undefined) || activeParam.label}
         </span>
 
         {controlMode === 'EDITING' ? (

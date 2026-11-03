@@ -12,7 +12,8 @@ export function getInstantaneousBreath(
   timeInSec: number,
   settings: VentilatorSettings,
   patient: PatientParams,
-  mode: VentMode
+  mode: VentMode,
+  circuitConnected = true
 ): InstantBreathState {
   const rr = Math.max(4, settings.rr || 12);
   const cycleTime = 60 / rr;
@@ -24,10 +25,19 @@ export function getInstantaneousBreath(
   const eVal = Math.max(0.5, parseFloat(ieParts[1]) || 2);
   const inspFraction = 1 / (1 + eVal);
   const inspTime = cycleTime * inspFraction;
+  if (!circuitConnected) {
+    return {
+      pressure: 0,
+      flow: 0,
+      volume: 0,
+      phase: cyclePos < inspTime ? 'insp' : 'exp',
+      progress,
+    };
+  }
 
   const compliance = Math.max(10, patient.compliance || 50); // mL/cmH2O
-  const resistance = Math.max(2, patient.resistance || 5);    // cmH2O/L/s
-  const peep = Math.max(0, settings.peep || 5);
+  const resistance = Math.max(1, patient.resistance || 8);    // cmH2O/L/s
+  const peep = Math.max(0, settings.peep ?? 5);
   const tau = Math.max(0.08, (resistance * compliance) / 1000); // Time constant in seconds
 
   let pressure = peep;
@@ -64,19 +74,18 @@ export function getInstantaneousBreath(
       pressure = peep + pResistive + pElastic;
     } else {
       // Pressure Control (PC) or Pressure Support (PS)
-      const pinsp = mode === 'ps' ? (settings.pSupport || 10) : (settings.pinsp || 20);
-      const drivingP = Math.max(2, pinsp);
-
-      // Pressure rises smoothly to set inspiratory pressure above PEEP
-      pressure = peep + drivingP * (1 - Math.exp(-tInsp / (riseTau * 1.5)));
+      const pinsp = mode === 'ps' ? (settings.pSupport ?? 10) : (settings.pinsp ?? 20);
+      const drivingP = Math.max(0, pinsp);
+      const patientEffort = mode === 'ps' ? Math.max(0, patient.spontaneousDrive ?? 2) : 0;
 
       // Decelerating flow
-      const maxFlowLps = drivingP / resistance;
+      const maxFlowLps = (drivingP + patientEffort) / resistance;
       flow = maxFlowLps * Math.exp(-tInsp / tau) * 60;
 
       // Volume accumulation
-      const maxVt = drivingP * compliance;
+      const maxVt = (drivingP + patientEffort) * compliance;
       volume = maxVt * (1 - Math.exp(-tInsp / tau));
+      pressure = peep + (flow / 60) * resistance + volume / compliance;
     }
   } else {
     // EXPIRATION PHASE
@@ -86,8 +95,9 @@ export function getInstantaneousBreath(
     // Determine end-inspiratory volume and pressure for smooth expiration transition
     let endInspVt = settings.vt || 500;
     if (mode === 'pc' || mode === 'ps') {
-      const pinsp = mode === 'ps' ? (settings.pSupport || 10) : (settings.pinsp || 20);
-      endInspVt = pinsp * compliance * (1 - Math.exp(-inspTime / tau));
+      const pinsp = mode === 'ps' ? (settings.pSupport ?? 10) : (settings.pinsp ?? 20);
+      const patientEffort = mode === 'ps' ? Math.max(0, patient.spontaneousDrive ?? 2) : 0;
+      endInspVt = (pinsp + patientEffort) * compliance * (1 - Math.exp(-inspTime / tau));
     }
 
     const endInspPressure = peep + (endInspVt / compliance);
@@ -106,10 +116,9 @@ export function getInstantaneousBreath(
     pressure = peep + (endInspPressure - peep) * Math.exp(-tExp / tau);
   }
 
-  // Clamping for safety bounds
-  pressure = Math.max(0, Math.min(80, pressure));
-  flow = Math.max(-160, Math.min(160, flow));
-  volume = Math.max(0, Math.min(1200, volume));
+  // Keep physical values intact; display components choose their own scales.
+  pressure = Math.max(0, pressure);
+  volume = Math.max(0, volume);
 
   return { pressure, flow, volume, phase, progress };
 }

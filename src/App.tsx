@@ -1,547 +1,151 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import {
-  VentilatorSettings,
-  PatientParams,
-  VentMode,
-  Language,
-  AppStep,
-  PatientCase,
-  MedicationSelection,
-  IntraoperativeEvent,
-} from './types';
+import React,{useEffect,useRef,useState} from 'react';
+import { CARDIAC_RHYTHMS, RHYTHM_LABELS, CardiacRhythm } from './lib/cardiacWaveform';
+import { Language, AppStep, VentMode, PatientCase, PatientParams } from './types';
 import { PATIENT_CASES, INTRAOPERATIVE_EVENTS } from './data/patientCases';
-import { calculatePhysiology } from './lib/physiologyEngine';
+import { createRuntime, advanceSimulation, pendingSettings, runtimeContext, recoveryReady, SimulationCommand } from './lib/simulationRuntime';
+import { useSimulationRuntime } from './hooks/useSimulationRuntime';
+import { MedicationId, MedicationAdministration } from './lib/medicationModel';
+import { SELECTABLE_PARAMETERS, getParamCurrentValue, isParameterEnabled, isValidParameterValue, ControlMode, ParameterSpec } from './lib/controlSystem';
 import { detectAlarms, ActiveAlarm } from './lib/alarmEngine';
+import { startAlarmSound,stopAlarmTones } from './lib/audioTone';
+import { TRANSLATIONS } from './i18n/translations';
 import { WelcomeScreen } from './components/WelcomeScreen';
-import { PatientIntakeScreen } from './components/PatientIntakeScreen';
-import { ClinicalScenarioBar } from './components/ClinicalScenarioBar';
+import { PatientIntakeScreen, InductionOrder } from './components/PatientIntakeScreen';
+import { PracticeScreen } from './components/PracticeScreen';
 import { TopBar } from './components/TopBar';
 import { AlarmBanner } from './components/AlarmBanner';
-import { WaveformCanvas } from './components/WaveformCanvas';
+import { CrisisEnginePanel } from './components/CrisisEnginePanel';
+import { VentilatorMonitor } from './components/VentilatorMonitor';
+import { VitalsMonitor } from './components/VitalsMonitor';
 import { PVLoopCanvas } from './components/PVLoopCanvas';
 import { NumericTilesPanel } from './components/NumericTilesPanel';
+import { DirectParameterControls } from './components/DirectParameterControls';
 import { HardwareDial } from './components/HardwareDial';
-import { MedicationPanel } from './components/MedicationPanel';
-import {
-  ControlMode,
-  SELECTABLE_PARAMETERS,
-  getParamCurrentValue,
-  ParameterSpec,
-} from './lib/controlSystem';
-import { playCancelBeep, startAlarmSound, stopAlarmTones } from './lib/audioTone';
-import { TRANSLATIONS } from './i18n/translations';
-import { PracticeScreen } from './components/PracticeScreen';
+import { MonitorCover } from './components/MonitorCover';
+import { MedicationDrawer,DrawerSelection } from './components/MedicationDrawer';
+import { InfusionSummary,formatSimTime } from './components/InfusionSummary';
+const casePatient=(c:PatientCase):PatientParams=>({compliance:c.baselineCompliance,resistance:c.baselineResistance,spontaneousDrive:2,preset:c.preset});
+const caseSettings=(c:PatientCase)=>({fio2:40,rr:12,vt:Math.max(200,Math.min(800,Math.round(c.ibwKg*7/10)*10)),pinsp:20,peep:5,ieRatio:'1:2',pSupport:10});
 
 export function App() {
-  const [language, setLanguage] = useState<Language>(() => {
-    try { return localStorage.getItem('ventilation-language-v1') === 'en' ? 'en' : 'cs'; } catch { return 'cs'; }
-  });
-  useEffect(() => {
-    document.documentElement.lang = language;
-    document.title = language === 'cs' ? 'Simulátor umělé plicní ventilace' : 'Mechanical Ventilation Simulator';
-    try { localStorage.setItem('ventilation-language-v1', language); } catch { /* Storage can be unavailable. */ }
-  }, [language]);
-  const dialPanelRef = useRef<HTMLDivElement>(null);
-  const [appStep, setAppStep] = useState<AppStep>('welcome');
-  const [simulationStartTime, setSimulationStartTime] = useState(0);
-  const practiceOrigin = useRef<AppStep>('welcome');
-  const practiceOpenedAt = useRef(0);
-
-  // Workspace layout control states (electible choices)
-  const [showPVLoop, setShowPVLoop] = useState(true);
-  const [showMeds, setShowMeds] = useState(true);
-
-  // Active Clinical Case & Induction Medications
-  const [selectedCase, setSelectedCase] = useState<PatientCase>(PATIENT_CASES[0]);
-  const [activeEvent, setActiveEvent] = useState<IntraoperativeEvent>(INTRAOPERATIVE_EVENTS[0]);
-
-  const [meds, setMeds] = useState<MedicationSelection>({
-    inductionAgent: 'propofol',
-    inductionDoseMgKg: 2.0,
-    opioid: 'fentanyl',
-    opioidDoseMcgKg: 2.0,
-    nmb: 'rocuronium',
-    nmbDoseMgKg: 0.6,
-    volatileGas: 'sevoflurane',
-    volatileMac: 1.2,
-  });
-
-  const [mode, setMode] = useState<VentMode>('vc');
-  const [alarmActive, setAlarmActive] = useState<boolean>(false);
-  const [isSilenced, setIsSilenced] = useState<boolean>(false);
-
-  // Dynamic Medication levels (Anesthesia Dashboard)
-  const [sevofluraneMac, setSevofluraneMac] = useState<number>(1.2);
-  const [nmbLevel, setNmbLevel] = useState<number>(90);
-  const [sedationLevel, setSedationLevel] = useState<number>(90);
-
-  // Active Ventilator Settings (Initializes to protective VT for selected case)
-  const [settings, setSettings] = useState<VentilatorSettings>({
-    fio2: 40,
-    rr: 12,
-    vt: Math.round(PATIENT_CASES[0].ibwKg * 7),
-    pinsp: 20,
-    peep: 5,
-    ieRatio: '1:2',
-    pSupport: 10,
-  });
-
-  // closed-Loop Simulation check: is patient properly anesthetized/relaxed?
-  const isPatientQuiet = nmbLevel > 40 || sevofluraneMac > 0.8 || sedationLevel > 35;
-  const isBuckingSuppressed = activeEvent.id === 'event_bucking' && isPatientQuiet;
-
-  // Bronchospasm bronchodilation via Sevoflurane (high MAC >= 1.5 relaxes airway smooth muscle)
-  const isBronchospasmTreated = activeEvent.id === 'event_bronchospasm' && sevofluraneMac >= 1.5;
-
-  // Atelectasis recruitment via PEEP (PEEP >= 8 cmH2O recruits collapsed alveoli)
-  const isAtelectasisRecruited = activeEvent.id === 'event_atelectasis' && settings.peep >= 8;
-
-  let complianceModifier = activeEvent.compliance;
-  let resistanceModifier = activeEvent.resistance;
-
-  if (isBuckingSuppressed) {
-    complianceModifier = 0;
-    resistanceModifier = 0;
-  } else if (isBronchospasmTreated) {
-    resistanceModifier = 4; // reduced resistance penalty
-  } else if (isAtelectasisRecruited) {
-    complianceModifier = -4; // reduced compliance penalty (recruited)
-  }
-
-  // Dynamic Patient Parameters driven by baseline case + active intraoperative event
-  const effectiveCompliance = Math.max(10, selectedCase.baselineCompliance + complianceModifier);
-  const effectiveResistance = Math.max(2, selectedCase.baselineResistance + resistanceModifier);
-
-  const patient: PatientParams = {
-    compliance: effectiveCompliance,
-    resistance: effectiveResistance,
-    preset: selectedCase.preset,
+  const [language,setLanguage]=useState<Language>(()=>{try{return localStorage.getItem('ventilation-language-v1')==='en'?'en':'cs';}catch{return 'cs';}});
+  const cs=language==='cs';
+  const [inputStyle,setInputStyle]=useState<'direct'|'dial'>(()=>{try{return localStorage.getItem('ventilation-input-style-v1')==='dial'?'dial':'direct';}catch{return 'direct';}});
+  useEffect(()=>{document.documentElement.lang=language;document.title=cs?'Simulátor umělé plicní ventilace':'Mechanical Ventilation Simulator';try{localStorage.setItem('ventilation-language-v1',language);}catch{}},[language]);
+  useEffect(()=>{try{localStorage.setItem('ventilation-input-style-v1',inputStyle);}catch{}},[inputStyle]);
+  const [appStep,setAppStep]=useState<AppStep>('welcome');
+  const practiceOrigin=useRef<AppStep>('welcome');
+  const [selectedCase,setSelectedCase]=useState(PATIENT_CASES[0]);
+  const [initial]=useState(()=>createRuntime(caseSettings(PATIENT_CASES[0]),casePatient(PATIENT_CASES[0])));
+  const runtime=useSimulationRuntime(initial,appStep==='simulation');
+  const state=runtime.state,settings=state.settings,mode=state.mode,readings=state.readings;
+  const context=runtimeContext(state);
+  const patient={...state.patient,compliance:context.compliance,resistance:context.resistance,spontaneousDrive:context.drive};
+  const [commandError,setCommandError]=useState(false);
+  const send=(command:SimulationCommand)=>{const result=runtime.send(command);setCommandError(result.some(event=>event.type==='command-rejected'));};
+  const [showPV,setShowPV]=useState(false),[showAnesthesia,setShowAnesthesia]=useState(true);
+  const [vitalsCovered,setVitalsCovered]=useState(false),[ventilatorCovered,setVentilatorCovered]=useState(false);
+  const [alarmTest,setAlarmTest]=useState(false),[silencedUntil,setSilencedUntil]=useState(0);
+  const silenceSeconds=Math.max(0,Math.ceil(silencedUntil-state.timeMs/1000));
+  const silenced=silenceSeconds>0;
+  const [drawerOpen,setDrawerOpen]=useState(false),[drawerTab,setDrawerTab]=useState<'drugs'|'fluids'>('drugs');
+  const [drawerSelection,setDrawerSelection]=useState<DrawerSelection>(null);
+  const openDrawer=(tab:'drugs'|'fluids'='drugs',selection:DrawerSelection=null)=>{setDrawerTab(tab);setDrawerSelection(selection);setDrawerOpen(true);};
+  const [controlMode,setControlMode]=useState<ControlMode>('NAVIGATING');
+  const [paramIndex,setParamIndex]=useState(0),[stagedValue,setStagedValue]=useState<number|string>(40);
+  const [deadline,setDeadline]=useState(0),[timeoutSec,setTimeoutSec]=useState(7),[timeoutWarning,setTimeoutWarning]=useState(false);
+  const dialRef=useRef<HTMLDivElement>(null);
+  const activeParam=SELECTABLE_PARAMETERS[paramIndex];
+  const liveValue=getParamCurrentValue(activeParam.id,settings,mode,patient);
+  useEffect(()=>{if(controlMode==='NAVIGATING')setStagedValue(liveValue);},[controlMode,liveValue,activeParam.id]);
+  useEffect(()=>{
+    if(controlMode!=='EDITING')return;
+    const update=()=>{const left=Math.ceil((deadline-performance.now())/1000);setTimeoutSec(Math.max(0,left));if(left<=0){setControlMode('NAVIGATING');setTimeoutWarning(true);}};
+    update();const timer=setInterval(update,100);return()=>clearInterval(timer);
+  },[controlMode,deadline]);
+  const commit=(id:string,value:number|string)=>{
+    const param=SELECTABLE_PARAMETERS.find(p=>p.id===id);
+    if(!param||!isParameterEnabled(id,mode)||!isValidParameterValue(param,value))return;
+    send(id==='mode'?{type:'configure',mode:value as VentMode}:{type:'configure',settings:{[id]:value}});
   };
-
-  // Formulate status feedback for clinical events
-  let clinicalStatusMessage = '';
-  if (activeEvent.id === 'event_bucking') {
-    if (isPatientQuiet) {
-      clinicalStatusMessage = language === 'cs'
-        ? 'PROBUZENÍ POTLAČENO: Pacient zklidněn svalovou relaxací (NMB) / hloubkou anestezie.'
-        : 'PATIENT CALMED: Spontaneous efforts successfully suppressed by NMB block / anesthetic depth.';
-    } else {
-      clinicalStatusMessage = language === 'cs'
-        ? 'PACIENT BOJUJE S VENTILÁTOREM! Podejte bolus relaxancia (NMB) nebo zvyšte Sevofluran.'
-        : 'PATIENT COUGHING/BUCKING! Administer NMB bolus or deepen anesthesia (increase Sevoflurane).';
-    }
-  } else if (activeEvent.id === 'event_bronchospasm') {
-    if (isBronchospasmTreated) {
-      clinicalStatusMessage = language === 'cs'
-        ? 'TERAPIE ÚSPĚŠNÁ: Bronchospasmus uvolněn dilatačním účinkem Sevofluranu (MAC >= 1.5).'
-        : 'THERAPY SUCCESSFUL: Bronchospasm relieved by Sevoflurane smooth muscle dilation (MAC >= 1.5).';
-    } else {
-      clinicalStatusMessage = language === 'cs'
-        ? 'KONTRAKCE DÝCHACÍCH CEST: Zvyšte anestetický plyn (Sevofluran >= 1.5 MAC) k vyvolání bronchodilatace.'
-        : 'AIRWAY CONSTRICTION: Deepen volatile anesthetic (Sevoflurane >= 1.5 MAC) to trigger bronchodilation.';
-    }
-  } else if (activeEvent.id === 'event_atelectasis') {
-    if (isAtelectasisRecruited) {
-      clinicalStatusMessage = language === 'cs'
-        ? 'REKRUTACE DOKONČENA: Kolabované sklípky byly otevřeny zvýšeným PEEP (>= 8 cmH₂O).'
-        : 'RECRUITMENT SUCCESSFUL: Collapsed alveoli reopened by elevated baseline PEEP (>= 8 cmH₂O).';
-    } else {
-      clinicalStatusMessage = language === 'cs'
-        ? 'ATELEKTÁZA A SHUNT: Zvyšte PEEP (>= 8 cmH₂O) k rekrutaci kolabovaných plicních segmentů.'
-        : 'ATELECTASIS & SHUNTING: Elevate PEEP (>= 8 cmH₂O) to recruit collapsed alveolar segments.';
-    }
-  }
-
-  // Turn-Push-Turn-Push Control System State
-  const [controlMode, setControlMode] = useState<ControlMode>('NAVIGATING');
-  const [activeParamIndex, setActiveParamIndex] = useState<number>(0);
-  const activeParam = SELECTABLE_PARAMETERS[activeParamIndex] || SELECTABLE_PARAMETERS[0];
-
-  const [stagedValue, setStagedValue] = useState<number | string>(
-    getParamCurrentValue(activeParam.id, settings, mode, patient)
-  );
-
-  const [timeoutSec, setTimeoutSec] = useState<number>(7);
-  const [timeoutWarning, setTimeoutWarning] = useState<boolean>(false);
-
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Calculated Real-time Physiology & Alarms
-  const physiology = calculatePhysiology(settings, patient, mode);
-  const detectedAlarms = detectAlarms(physiology, language);
-
-  let activeAlarms: ActiveAlarm[] = [...detectedAlarms];
-  if (alarmActive) {
-    activeAlarms.unshift({
-      id: 'simulated_test_alarm',
-      level: 'critical',
-      message: language === 'cs' ? 'ALARM: SIMULOVANÁ HYPOXIE / VYSOKÝ Ppeak' : 'CRITICAL ALARM: SIMULATED HIGH PRESSURE',
-      code: 'HIGH Ppeak 42 cmH₂O',
-    });
-  }
-
-  const highestAlarmLevel = activeAlarms.some((a) => a.level === 'critical')
-    ? 'critical'
-    : activeAlarms.length > 0
-    ? 'warning'
-    : 'none';
-
-  // Update settings when user selects a different case on Welcome screen
-  const handleSelectCase = (c: PatientCase) => {
-    setSelectedCase(c);
-    setActiveEvent(INTRAOPERATIVE_EVENTS[0]); // reset event to baseline
-    setSettings((prev) => ({
-      ...prev,
-      vt: Math.round(c.ibwKg * 7),
-    }));
+  const selectParam=(param:ParameterSpec)=>{
+    if(!isParameterEnabled(param.id,mode))return;
+    setParamIndex(SELECTABLE_PARAMETERS.indexOf(param));setStagedValue(getParamCurrentValue(param.id,settings,mode,patient));
+    setControlMode('EDITING');setDeadline(performance.now()+7000);setTimeoutWarning(false);dialRef.current?.scrollIntoView({block:'nearest'});
   };
-
-  // Synchronize stagedValue when activeParam changes in NAVIGATING mode
-  useEffect(() => {
-    if (controlMode === 'NAVIGATING') {
-      setStagedValue(getParamCurrentValue(activeParam.id, settings, mode, patient));
-    }
-  }, [activeParam, settings, mode, patient, controlMode]);
-
-  // 7-second Safety Timeout Timer for EDITING state
-  useEffect(() => {
-    if (controlMode === 'EDITING') {
-      setTimeoutSec(7);
-
-      if (timerRef.current) clearInterval(timerRef.current);
-
-      timerRef.current = setInterval(() => {
-        setTimeoutSec((prev) => {
-          if (prev <= 1) {
-            // Safety Timeout Triggered: Revert temporary value
-            if (timerRef.current) clearInterval(timerRef.current);
-            playCancelBeep();
-            setTimeoutWarning(true);
-            setControlMode('NAVIGATING');
-            setTimeout(() => setTimeoutWarning(false), 2500);
-            return 7;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } else {
-      if (timerRef.current) clearInterval(timerRef.current);
-    }
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [controlMode, activeParamIndex]);
-
-  // Medication levels decay ticker
-  useEffect(() => {
-    if (appStep !== 'simulation') return;
-    const interval = setInterval(() => {
-      setNmbLevel((prev) => Math.max(0, prev - 0.5));
-      setSedationLevel((prev) => Math.max(0, prev - 0.7));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [appStep]);
-
-  // Trigger synthesized audio alarms based on active alarms and silence status
-  useEffect(() => {
-    if (appStep !== 'simulation' || isSilenced || highestAlarmLevel === 'none') {
-      stopAlarmTones();
-      return;
-    }
-
-    if (highestAlarmLevel === 'critical') {
-      startAlarmSound('critical');
-    } else if (highestAlarmLevel === 'warning') {
-      startAlarmSound('warning');
-    }
-
-    return () => {
-      stopAlarmTones();
-    };
-  }, [highestAlarmLevel, isSilenced, appStep]);
-
-  // Commit function when user pushes dial to CONFIRM in EDITING state
-  const commitStagedValue = useCallback(() => {
-    const id = activeParam.id;
-
-    if (id === 'mode') {
-      setMode(stagedValue as VentMode);
-    } else {
-      setSettings((prev) => ({
-        ...prev,
-        [id]: stagedValue,
-      }));
-    }
-
-    setControlMode('NAVIGATING');
-  }, [activeParam, stagedValue]);
-
-  // Handle Turn Action
-  const handleTurn = (direction: -1 | 1) => {
-    setTimeoutSec(7); // reset timeout clock on interaction
-
-    if (controlMode === 'NAVIGATING') {
-      // Cycle selected parameter tile
-      setActiveParamIndex((prev) => {
-        const next = prev + direction;
-        if (next < 0) return SELECTABLE_PARAMETERS.length - 1;
-        if (next >= SELECTABLE_PARAMETERS.length) return 0;
-        return next;
-      });
-    } else {
-      // Adjust staged value in EDITING state
-      if (activeParam.options) {
-        const opts = activeParam.options;
-        const currentIdx = opts.indexOf(String(stagedValue));
-        let nextIdx = currentIdx + direction;
-        if (nextIdx < 0) nextIdx = opts.length - 1;
-        if (nextIdx >= opts.length) nextIdx = 0;
-        setStagedValue(opts[nextIdx]);
-      } else if (typeof stagedValue === 'number') {
-        const step = activeParam.step || 1;
-        const min = activeParam.min ?? 0;
-        const max = activeParam.max ?? 1000;
-        const nextVal = Math.max(min, Math.min(max, stagedValue + direction * step));
-        setStagedValue(nextVal);
-      }
-    }
+  const turn=(direction:-1|1)=>{
+    setDeadline(performance.now()+7000);
+    if(controlMode==='NAVIGATING')setParamIndex(previous=>{let index=previous;do{index=(index+direction+SELECTABLE_PARAMETERS.length)%SELECTABLE_PARAMETERS.length;}while(!isParameterEnabled(SELECTABLE_PARAMETERS[index].id,mode));return index;});
+    else if(activeParam.options){const options=activeParam.options;setStagedValue(options[(options.indexOf(String(stagedValue))+direction+options.length)%options.length]);}
+    else setStagedValue(Number(Math.max(activeParam.min!,Math.min(activeParam.max!,Number(stagedValue)+direction*activeParam.step!)).toFixed(3)));
   };
-
-  // Handle Push Action
-  const handlePush = () => {
-    if (controlMode === 'NAVIGATING') {
-      // Enter EDITING mode
-      setStagedValue(getParamCurrentValue(activeParam.id, settings, mode, patient));
-      setControlMode('EDITING');
-    } else {
-      // Confirm & commit staged value
-      commitStagedValue();
-    }
+  const push=()=>{if(controlMode==='EDITING'){commit(activeParam.id,stagedValue);setControlMode('NAVIGATING');}else selectParam(activeParam);};
+  const alarms:ActiveAlarm[]=detectAlarms(readings,language);
+  if(readings.apnea)alarms.unshift({id:'apnea',level:'critical',message:cs?'APNOE — chybí spontánní dechy':'APNEA — no spontaneous breaths',code:readings.backup?(cs?'ZÁLOŽNÍ PC AKTIVNÍ':'BACKUP PC ACTIVE'):(cs?'ZÁLOHA VYPNUTA':'BACKUP DISABLED')});
+  if(!readings.circuitConnected)alarms.unshift({id:'disconnect',level:'critical',message:cs?'ODPOJENÝ OKRUH':'CIRCUIT DISCONNECTED',code:'Paw / VTe / CO₂ = 0'});
+  if(context.crisis.specialAlarm)alarms.unshift({id:context.crisis.specialAlarm,level:context.crisis.specialAlarm==='tension-pneumothorax'?'critical':'warning',message:cs?'ALARM ŘÍZENÉHO SCÉNÁŘE':'GUIDED SCENARIO ALARM',code:context.crisis.specialAlarm});
+  if(alarmTest)alarms.unshift({id:'test',level:'critical',message:cs?'TEST ALARMU':'ALARM TEST',code:'TEST'});
+  const alarmLevel=alarms.some(alarm=>alarm.level==='critical')?'critical':alarms.length?'warning':'none';
+  useEffect(()=>{if(appStep!=='simulation'||silenced||alarmLevel==='none'||!state.running){stopAlarmTones();return;}startAlarmSound(alarmLevel);return stopAlarmTones;},[alarmLevel,silenced,appStep,state.running]);
+  const openPractice=()=>{practiceOrigin.current=appStep;setControlMode('NAVIGATING');setDrawerOpen(false);setAppStep('practice');};
+  const start=(orders:InductionOrder[],mac:number)=>{
+    let next=createRuntime(caseSettings(selectedCase),casePatient(selectedCase));
+    const commands:SimulationCommand[]=[{type:'vaporizer',mac},...orders.map(order=>({type:'medication' as const,event:{id:crypto.randomUUID(),...order,administration:'bolus' as const,administeredAtSeconds:0}}))];
+    next=advanceSimulation(next,commands,0).state;runtime.reset(next);setSilencedUntil(0);setCommandError(false);setAppStep('simulation');
   };
-
-  // Direct touch/click on parameter tile
-  const handleSelectParamDirect = (param: ParameterSpec) => {
-    const idx = SELECTABLE_PARAMETERS.findIndex((p) => p.id === param.id);
-    if (idx !== -1) {
-      setActiveParamIndex(idx);
-      setStagedValue(getParamCurrentValue(param.id, settings, mode, patient));
-      setControlMode('EDITING');
-      setTimeoutSec(7);
-      dialPanelRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    }
+  const administer=(medication:MedicationId,administration:MedicationAdministration,amount:number,unit:string)=>{
+    const events=runtime.send(current=>({type:'medication',event:{id:crypto.randomUUID(),medication,administration,amount,unit,administeredAtSeconds:current.timeMs/1000}}));
+    setCommandError(events.some(event=>event.type==='command-rejected'));
   };
-
-  const t = TRANSLATIONS[language] || TRANSLATIONS.cs;
-
-  const openPractice = () => {
-    practiceOrigin.current = appStep;
-    practiceOpenedAt.current = performance.now();
-    setControlMode('NAVIGATING');
-    setAppStep('practice');
-  };
-
-  if (appStep === 'practice') {
-    return <PracticeScreen language={language} setLanguage={setLanguage} onBack={() => {
-      if (practiceOrigin.current === 'simulation') {
-        const pausedFor = performance.now() - practiceOpenedAt.current;
-        setSimulationStartTime((start) => start + pausedFor);
-      }
-      setAppStep(practiceOrigin.current);
-    }} />;
-  }
-
-  // ROUTE 1: Welcome Screen
-  if (appStep === 'welcome') {
-    return (
-      <WelcomeScreen
-        language={language}
-        setLanguage={setLanguage}
-        selectedCase={selectedCase}
-        onSelectCase={handleSelectCase}
-        onStartCase={() => setAppStep('intake')}
-        onOpenPractice={openPractice}
-      />
-    );
-  }
-
-  // ROUTE 2: Patient Intake & Medication Induction Screen
-  if (appStep === 'intake') {
-    return (
-      <PatientIntakeScreen
-        language={language}
-        setLanguage={setLanguage}
-        patientCase={selectedCase}
-        meds={meds}
-        setMeds={setMeds}
-        settings={settings}
-        setSettings={setSettings}
-        onProceedToSimulation={() => {
-          setSevofluraneMac(meds.volatileMac);
-          setNmbLevel(Math.min(100, meds.nmbDoseMgKg * 150));
-          setSedationLevel(Math.min(100, meds.inductionDoseMgKg * 45));
-          setSimulationStartTime(performance.now());
-          setAppStep('simulation');
-        }}
-        onBackToWelcome={() => setAppStep('welcome')}
-        onOpenPractice={openPractice}
-      />
-    );
-  }
-
-  // ROUTE 3: Mechanical Ventilation Simulation Screen
-  return (
-    <div className="w-full min-h-dvh bg-[#050505] text-[#E5E2E1] flex flex-col font-mono select-none">
-      {/* Top Anesthesia Header */}
-      <TopBar
-        language={language}
-        setLanguage={setLanguage}
-        mode={mode}
-        settings={settings}
-        patient={patient}
-        alarmActive={alarmActive}
-        setAlarmActive={setAlarmActive}
-        onOpenPractice={openPractice}
-      />
-
-      {/* Intraoperative Clinical Scenario Challenge Bar */}
-      <ClinicalScenarioBar
-        language={language}
-        patientCase={selectedCase}
-        settings={settings}
-        activeEvent={activeEvent}
-        onSelectEvent={(ev) => setActiveEvent(ev)}
-        onBackToIntake={() => { setControlMode('NAVIGATING'); setAppStep('intake'); }}
-        clinicalStatusMessage={clinicalStatusMessage}
-        onReconnectCircuit={() => {
-          setActiveEvent(INTRAOPERATIVE_EVENTS[0]);
-        }}
-      />
-
-      {/* Workspace Panel Configuration Row (Electible Choices) */}
-      <div className="bg-[#0C1216] border-b border-[#1A2830] px-4 py-1 flex flex-wrap items-center justify-between text-[10px] md:text-xs font-mono select-none gap-2">
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="text-[#839493] font-bold uppercase tracking-wider text-[9px] md:text-[10px]">
-            {language === 'cs' ? 'ZOBRAZENÍ PANELŮ:' : 'WORKSPACE PANELS:'}
-          </span>
-          <button
-            aria-pressed={showPVLoop}
-            onClick={() => setShowPVLoop(prev => !prev)}
-            className={`px-2 py-0.5 rounded text-[9px] md:text-[10px] font-bold border transition-all cursor-pointer ${
-              showPVLoop
-                ? 'bg-cyan-950/80 text-cyan-300 border-cyan-500/40 shadow-[0_0_8px_rgba(6,182,212,0.15)]'
-                : 'bg-zinc-900/60 text-zinc-500 border-zinc-800'
-            }`}
-          >
-            {showPVLoop ? '✓ ' : '✗ '}{language === 'cs' ? 'P-V smyčka' : 'P-V Loop'}
-          </button>
-          <button
-            aria-pressed={showMeds}
-            onClick={() => setShowMeds(prev => !prev)}
-            className={`px-2 py-0.5 rounded text-[9px] md:text-[10px] font-bold border transition-all cursor-pointer ${
-              showMeds
-                ? 'bg-cyan-950/80 text-cyan-300 border-cyan-500/40 shadow-[0_0_8px_rgba(6,182,212,0.15)]'
-                : 'bg-zinc-900/60 text-zinc-500 border-zinc-800'
-            }`}
-          >
-            {showMeds ? '✓ ' : '✗ '}{language === 'cs' ? 'Léky' : 'Medications'}
-          </button>
-        </div>
-        <div className="text-[8px] md:text-[9px] text-zinc-500">
-          {language === 'cs' ? 'Kliknutím skryjete panely a uvolníte místo na displeji' : 'Toggle optional panels to optimize screen layout'}
-        </div>
-      </div>
-
-      {/* Alarm Banner Overlay */}
-      <AlarmBanner
-        language={language}
-        alarms={activeAlarms}
-        isSilenced={isSilenced}
-        onSilenceToggle={() => setIsSilenced(!isSilenced)}
-      />
-
-      {/* Main Screen Layout (Optimized for Mobile Landscape and Responsive Portrait Viewports) */}
-      <main className="simulation-main p-2 sm:p-4 max-w-[1920px] w-full mx-auto">
-        {/* UPPER SECTION (Top 55% of height / Rows 1 to 7): Real-time Waveforms */}
-        <section className="waveform-panel">
-          <WaveformCanvas
-            startTime={simulationStartTime}
-            settings={settings}
-            patient={patient}
-            mode={mode}
-            language={language}
-          />
-        </section>
-
-        {/* LOWER SECTION (Bottom 45% of height / Rows 8 to 12): Split into P-V Loop, Telemetry Tiles, Medications, and GE Dial */}
-        <section className="dashboard-panels">
-
-          <div className="numeric-panel">
-            <NumericTilesPanel
-              physiology={physiology}
-              settings={settings}
-              patient={patient}
-              mode={mode}
-              language={language}
-              controlMode={controlMode}
-              activeParam={activeParam}
-              stagedValue={stagedValue}
-              onSelectParam={handleSelectParamDirect}
-            />
-          </div>
-
-
-          <div className="dial-panel" ref={dialPanelRef}>
-            <HardwareDial
-              language={language}
-              onCancel={() => setControlMode('NAVIGATING')}
-              controlMode={controlMode}
-              activeParam={activeParam}
-              stagedValue={stagedValue}
-              liveValue={getParamCurrentValue(activeParam.id, settings, mode, patient)}
-              timeoutSec={timeoutSec}
-              timeoutWarning={timeoutWarning}
-              onTurn={handleTurn}
-              onPush={handlePush}
-            />
-          </div>
-
-          {showMeds && (
-            <div className="meds-panel">
-              <MedicationPanel
-                language={language}
-                sevofluraneMac={sevofluraneMac}
-                setSevofluraneMac={setSevofluraneMac}
-                nmbLevel={nmbLevel}
-                administerNmb={() => setNmbLevel(100)}
-                sedationLevel={sedationLevel}
-                administerSedative={() => setSedationLevel(100)}
-              />
-            </div>
-          )}
-
-
-          {showPVLoop && (
-            <div className="pv-panel">
-              <PVLoopCanvas
-                startTime={simulationStartTime}
-                settings={settings}
-                patient={patient}
-                mode={mode}
-                language={language}
-              />
-            </div>
-          )}
-
-        </section>
-      </main>
-
-      {/* Bottom Educational Disclaimer Footer */}
-      <footer className="w-full bg-[#0A0A0A] border-t border-[#1C1C1C] py-1 px-4 text-center text-[9px] font-mono text-zinc-500 shrink-0">
-        <p>{t.disclaimer}</p>
-      </footer>
-    </div>
-  );
+  if(appStep==='practice')return <PracticeScreen language={language} setLanguage={setLanguage} onBack={()=>setAppStep(practiceOrigin.current)}/>;
+  if(appStep==='welcome')return <WelcomeScreen language={language} setLanguage={setLanguage} selectedCase={selectedCase} onSelectCase={setSelectedCase} onStartCase={()=>setAppStep('intake')} onOpenPractice={openPractice}/>;
+  if(appStep==='intake')return <PatientIntakeScreen language={language} setLanguage={setLanguage} patientCase={selectedCase} onProceedToSimulation={start} onBackToWelcome={()=>setAppStep('welcome')} onOpenPractice={openPractice}/>;
+  return <div className="simulation-app font-mono">
+    <TopBar language={language} setLanguage={setLanguage} mode={state.activeMode} settings={state.activeSettings} patient={patient} alarmActive={alarmTest} setAlarmActive={setAlarmTest} onOpenPractice={openPractice}/>
+    <div className="session-toolbar"><button onClick={()=>{setControlMode('NAVIGATING');setAppStep('intake');}}>{cs?'Nový úvod':'New induction'} · {cs?selectedCase.name.replace('yrs','let'):selectedCase.name}</button><span>{cs?'Čas simulace':'Simulation time'} {formatSimTime(state.timeMs/1000)}</span><strong>{state.activeMode.toUpperCase()}{readings.backup?' → BACKUP PC':''}</strong></div>
+    {runtime.hiddenPauseNotice&&<div className="runtime-notice" role="status">{cs?'Při skrytí záložky byla celá simulace pozastavena. Pokračuje od stejného času.':'The entire simulation was paused while the tab was hidden. Resuming from the same simulation time.'}<button onClick={runtime.dismissHiddenPause}>OK</button></div>}
+    {commandError&&<div role="alert" className="runtime-notice">{cs?'Změna nebyla přijata. Zkontrolujte rozsah, Ti min ≤ Ti max a aktuální stav.':'Change rejected. Check bounds, Ti min ≤ Ti max, and the current state.'}<button onClick={()=>setCommandError(false)}>OK</button></div>}
+    <details className="mechanics-demo"><summary>{cs?'Demonstrace mechaniky (mimo řízené scénáře)':'Mechanics demonstration (outside guided scenarios)'}</summary><p>{cs?'Izolované změny mechaniky; nejde o léčebné pokyny. Při řízeném scénáři jsou zakázány.':'Isolated mechanical changes; not treatment instructions. Disabled during a guided scenario.'}</p><div>{INTRAOPERATIVE_EVENTS.map(event=><button key={event.id} disabled={state.crisis.status!=='idle'} aria-pressed={state.demonstration===event.id} onClick={()=>send({type:'demonstration',id:event.id})}>{event.title[language]}</button>)}</div></details>
+    <CrisisEnginePanel language={language} crisis={state.crisis} nowSeconds={state.timeMs/1000} recoveryReady={recoveryReady(state)}
+      onStart={scenario=>send({type:'crisis-start',scenario})} onBeginRecovery={()=>send({type:'crisis-recover'})}
+      onRecordVolumeSupport={()=>openDrawer('fluids')} onReconnectCircuit={()=>send({type:'crisis-intervention',intervention:'reconnect-circuit'})}
+      onDecompressPneumothorax={()=>send({type:'crisis-intervention',intervention:'decompress-pneumothorax'})}
+      onRepositionTube={()=>send({type:'crisis-intervention',intervention:'reposition-tube'})}
+      onAcknowledgeSurgeonRequest={()=>send({type:'crisis-intervention',intervention:'acknowledge-surgeon-request'})}
+      onReset={()=>send({type:'crisis-reset'})}/>
+    <AlarmBanner language={language} alarms={alarms} isSilenced={silenced} silenceSeconds={silenceSeconds} onSilenceToggle={()=>setSilencedUntil(silenced?0:state.timeMs/1000+120)}/>
+    <main className="simulation-main p-2 sm:p-4 max-w-[1920px] w-full mx-auto">
+      <div className="session-toolbar"><span>{cs?'Panely:':'Panels:'}</span><button aria-pressed={showPV} onClick={()=>setShowPV(value=>!value)}>P-V</button><button aria-pressed={showAnesthesia} onClick={()=>setShowAnesthesia(value=>!value)}>{cs?'Anestezie':'Anesthesia'}</button></div>
+      <details className="rhythm-demo">
+        <summary>{cs?'Demonstrace srdečního rytmu':'Cardiac rhythm demonstration'} · {RHYTHM_LABELS[language][state.activeRhythm]}</summary>
+        <label>{cs?'Rytmus EKG':'ECG rhythm'}<select value={state.rhythm} onChange={event=>send({type:'rhythm',rhythm:event.target.value as CardiacRhythm})}>
+          {CARDIAC_RHYTHMS.map(rhythm=><option key={rhythm} value={rhythm}>{RHYTHM_LABELS[language][rhythm]}</option>)}
+        </select></label>
+        <p>{cs?'Změna od dalšího tepu. Výuková ukázka EKG a pulzní křivky; samostatně nemění krevní tlak a nesimuluje léčbu arytmií.':'Changes at the next beat. ECG and pulse waveform demonstration; it does not independently alter blood pressure or simulate arrhythmia treatment.'}</p>
+        {state.rhythm!==state.activeRhythm&&<span role="status">{cs?'Čeká na další tep':'Pending next beat'}</span>}
+      </details>
+      <section className="monitor-grid">
+        <article className="monitor-shell"><div className="monitor-heading"><h2>{cs?'MONITOR VITÁLNÍCH FUNKCÍ':'PATIENT VITALS MONITOR'}</h2><button className="monitor-cover-toggle" aria-pressed={vitalsCovered} onClick={()=>setVitalsCovered(value=>!value)}>{vitalsCovered?(cs?'ODKRÝT':'REVEAL'):(cs?'ZAKRÝT':'COVER')}</button></div><div className="monitor-display"><VitalsMonitor readState={runtime.readState} tick={state.timeMs} language={language}/><MonitorCover covered={vitalsCovered} onToggle={()=>setVitalsCovered(false)} language={language}/></div></article>
+        <article className="monitor-shell"><div className="monitor-heading"><h2>{cs?'MONITOR VENTILÁTORU':'VENTILATOR MONITOR'}</h2><button className="monitor-cover-toggle" aria-pressed={ventilatorCovered} onClick={()=>setVentilatorCovered(value=>!value)}>{ventilatorCovered?(cs?'ODKRÝT':'REVEAL'):(cs?'ZAKRÝT':'COVER')}</button></div>
+          <div className="monitor-display"><VentilatorMonitor readState={runtime.readState} tick={state.timeMs} language={language}/>
+          <MonitorCover covered={ventilatorCovered} onToggle={()=>setVentilatorCovered(false)} language={language}/></div>
+        </article>
+      </section>
+      <details className="model-detail"><summary>{cs?'Podrobnosti modelu a mechaniky':'Model and mechanics details'}</summary>
+        <NumericTilesPanel physiology={readings} settings={state.activeSettings} patient={patient} mode={state.activeMode} language={language} controlMode={controlMode} activeParam={activeParam} stagedValue={stagedValue} onSelectParam={selectParam} display="readouts"/>
+      </details>
+      <div className="input-style-switch" role="group" aria-label={cs?'Způsob ovládání':'Input style'}><span>{cs?'Ovládání:':'Controls:'}</span>{(['direct','dial'] as const).map(style=><button key={style} aria-pressed={inputStyle===style} onClick={()=>{setInputStyle(style);setControlMode('NAVIGATING');}}>{style==='direct'?(cs?'Číselné zadávání':'Numeric inputs'):(cs?'Otočný ovladač':'Rotary dial')}</button>)}</div>
+      {pendingSettings(state)&&<div className="pending-settings" role="status"><strong>{cs?'Čeká na další nádech:':'Pending next inspiration:'}</strong>{mode!==state.activeMode&&<span>{state.activeMode.toUpperCase()} → {mode.toUpperCase()}</span>}{SELECTABLE_PARAMETERS.filter(param=>param.id!=='mode'&&settings[param.id]!==state.activeSettings[param.id]).map(param=><span key={param.id}>{param.shortLabel}: {state.activeSettings[param.id]} → {settings[param.id]} {param.unit}</span>)}</div>}
+      <section className="dashboard-panels">
+        <div className="numeric-panel">{inputStyle==='direct'?<DirectParameterControls settings={settings} mode={mode} patient={patient} language={language} onCommit={commit}/>:<NumericTilesPanel physiology={readings} settings={settings} patient={patient} mode={mode} language={language} controlMode={controlMode} activeParam={activeParam} stagedValue={stagedValue} onSelectParam={selectParam} display="controls"/>}</div>
+        {inputStyle==='dial'&&<div className="dial-panel" ref={dialRef}><HardwareDial language={language} controlMode={controlMode} activeParam={activeParam} stagedValue={stagedValue} liveValue={liveValue} timeoutSec={timeoutSec} timeoutWarning={timeoutWarning} onTurn={turn} onPush={push} onCancel={()=>setControlMode('NAVIGATING')}/></div>}
+        {showAnesthesia&&<section className="anesthesia-panel"><h2>{cs?'Anestezie · společné účinky':'Anesthesia · shared effects'}</h2><label>Sevofluran (MAC)<input type="number" min="0" max="3" step="0.1" value={state.volatileMac} onChange={event=>{if(event.target.value!=='')send({type:'vaporizer',mac:Number(event.target.value)});}}/></label><p>{cs?'Sedace':'Sedation'}: {Math.round(readings.sedation*100)} % · {cs?'Svalový blok':'Muscle block'}: {Math.round(readings.block*100)} %</p><p>TOF ({cs?'výukový odhad':'teaching estimate'}): {readings.tof}/4 · Drive: {readings.drive.toFixed(2)} cmH₂O</p><p>{cs?'Svalová relaxace nezajišťuje bezvědomí. Všechny bolusy jsou v jedné historii.':'Muscle relaxation does not ensure unconsciousness. All boluses share one history.'}</p><div><button onClick={()=>openDrawer('drugs',{kind:'drug',id:'propofol'})}>Propofol…</button><button onClick={()=>openDrawer('drugs',{kind:'drug',id:'rocuronium'})}>{cs?'Rokuronium…':'Rocuronium…'}</button></div></section>}
+        {showPV&&<div className="pv-panel"><PVLoopCanvas readState={runtime.readState} tick={state.timeMs} language={language}/></div>}
+      </section>
+      <MedicationDrawer language={language} open={drawerOpen} onToggle={()=>setDrawerOpen(value=>!value)} readState={runtime.readState} tick={state.timeMs} send={send} onAdminister={administer} initialTab={drawerTab} initialSelection={drawerSelection}/>
+      <InfusionSummary readState={runtime.readState} tick={state.timeMs} language={language} send={send}/>
+    </main>
+    <footer className="simulation-footer">{TRANSLATIONS[language].disclaimer}</footer>
+  </div>;
 }
-
 export default App;

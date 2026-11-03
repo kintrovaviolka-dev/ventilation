@@ -5,6 +5,8 @@
  */
 
 import { VentilatorSettings, PatientParams, VentMode } from '../types';
+import { DEFAULT_PATIENT_PARAMS } from './simulationState';
+import { getInstantaneousBreath } from './waveformMath';
 
 export interface CalculatedPhysiology {
   pPeak: number;        // Peak Inspiratory Pressure (cmH2O)
@@ -22,6 +24,7 @@ export interface CalculatedPhysiology {
   pfRatio: number;      // PaO2 / FiO2 ratio (mmHg)
   ardsSeverity: 'normal' | 'mild' | 'moderate' | 'severe';
   flowPeak: number;     // Peak Flow (L/min)
+  inspiratoryFlow: number; // Peak inspiratory flow (L/s)
 }
 
 function safeNumber(val: number, fallback: number): number {
@@ -31,7 +34,8 @@ function safeNumber(val: number, fallback: number): number {
 export function calculatePhysiology(
   settings: VentilatorSettings,
   patient: PatientParams,
-  mode: VentMode
+  mode: VentMode,
+  circuitConnected = true
 ): CalculatedPhysiology {
   const fio2 = safeNumber(settings?.fio2, 40);
   const rr = safeNumber(settings?.rr, 12);
@@ -41,8 +45,9 @@ export function calculatePhysiology(
   const ieRatio = settings?.ieRatio || '1:2';
   const pSupport = safeNumber(settings?.pSupport, 10);
 
-  const compliance = safeNumber(patient?.compliance, 50);
-  const resistance = safeNumber(patient?.resistance, 5);
+  const compliance = Math.max(1, safeNumber(patient?.compliance, DEFAULT_PATIENT_PARAMS.compliance));
+  const resistance = Math.max(1, safeNumber(patient?.resistance, DEFAULT_PATIENT_PARAMS.resistance));
+  const spontaneousDrive = Math.max(0, safeNumber(patient?.spontaneousDrive, DEFAULT_PATIENT_PARAMS.spontaneousDrive));
 
   // 1. Parse I:E Ratio (e.g. "1:2" -> ratio = 2, f_insp = 1 / (1 + 2) = 0.333)
   const parts = ieRatio.split(':');
@@ -54,8 +59,6 @@ export function calculatePhysiology(
   const inspTime = cycleTime * inspFraction; // Inspiratory duration in seconds
 
   let deliveredVt = 0; // Delivered Tidal Volume in mL
-  let pPeak = 0;       // Peak Inspiratory Pressure in cmH2O
-  let pPlat = 0;       // Plateau Pressure in cmH2O
   let flowPeak = 0;    // Peak flow in L/min
 
   // 2. Mode-dependent mechanics calculations
@@ -63,58 +66,43 @@ export function calculatePhysiology(
     // VOLUME CONTROL (VC-CMV)
     deliveredVt = vt;
 
-    const flowLps = (deliveredVt / 1000) / Math.max(0.2, inspTime);
-    flowPeak = flowLps * 60;
-
-    const pElastic = deliveredVt / Math.max(1, compliance);
-    const pResistive = flowLps * Math.max(1, resistance);
-
-    pPlat = peep + pElastic;
-    pPeak = pPlat + pResistive;
-
   } else if (mode === 'pc') {
     // PRESSURE CONTROL (PC-CMV)
-    const drivingPressure = Math.max(1, pinsp);
+    const drivingPressure = Math.max(0, pinsp);
     
-    const tau = (Math.max(1, resistance) * (Math.max(1, compliance) / 1000));
-    const fillFactor = 1 - Math.exp(-inspTime / Math.max(0.05, tau));
+    const tau = resistance * (compliance / 1000);
+    const fillFactor = 1 - Math.exp(-inspTime / Math.max(0.08, tau));
     deliveredVt = Math.round(drivingPressure * Math.max(1, compliance) * fillFactor);
-    deliveredVt = Math.min(1200, Math.max(50, deliveredVt));
-
-    pPeak = peep + drivingPressure;
-    pPlat = peep + drivingPressure * fillFactor;
-    flowPeak = (drivingPressure / Math.max(1, resistance)) * 60;
+    deliveredVt = Math.max(0, deliveredVt);
 
   } else if (mode === 'simv') {
     // SIMV
     deliveredVt = vt;
-    const flowLps = (deliveredVt / 1000) / Math.max(0.2, inspTime);
-    flowPeak = flowLps * 60;
-
-    const pElastic = deliveredVt / Math.max(1, compliance);
-    const pResistive = flowLps * Math.max(1, resistance);
-
-    pPlat = peep + pElastic;
-    pPeak = pPlat + pResistive;
 
   } else if (mode === 'ps') {
     // PRESSURE SUPPORT (PSV)
-    const drivingPressure = pSupport > 0 ? pSupport : 8;
-    const tau = (Math.max(1, resistance) * (Math.max(1, compliance) / 1000));
+    const drivingPressure = Math.max(0, pSupport);
+    const tau = resistance * (compliance / 1000);
     
-    const psInspTime = Math.min(2.0, Math.max(0.4, 2.5 * tau));
-    const fillFactor = 1 - Math.exp(-psInspTime / Math.max(0.05, tau));
+    const psInspTime = inspTime; // Shared timed-cycle approximation with the waveform.
+    const fillFactor = 1 - Math.exp(-psInspTime / Math.max(0.08, tau));
 
-    deliveredVt = Math.round(drivingPressure * Math.max(1, compliance) * fillFactor);
-    deliveredVt = Math.min(1200, Math.max(50, deliveredVt));
+    deliveredVt = Math.round((drivingPressure + spontaneousDrive) * compliance * fillFactor);
+    deliveredVt = Math.max(0, deliveredVt);
 
-    pPeak = peep + drivingPressure;
-    pPlat = peep + drivingPressure * 0.92;
-    flowPeak = (drivingPressure / Math.max(1, resistance)) * 60;
   }
 
-  // Ensure Pplat never exceeds Ppeak or drops below PEEP
-  pPlat = Math.min(pPeak, Math.max(peep, pPlat));
+  // Peak inspiratory flow is derived from delivered volume and inspiratory time.
+  const inspiratoryFlow = mode === 'pc' || mode === 'ps'
+    ? getInstantaneousBreath(0, settings, patient, mode, circuitConnected).flow / 60
+    : (deliveredVt / 1000) / Math.max(0.2, inspTime);
+  flowPeak = inspiratoryFlow * 60;
+  const pPlat = peep + deliveredVt / compliance;
+  const waveformPeak = Math.max(
+    getInstantaneousBreath(0, settings, patient, mode, circuitConnected).pressure,
+    getInstantaneousBreath(Math.max(0, inspTime - 1e-6), settings, patient, mode, circuitConnected).pressure
+  );
+  const pPeak = waveformPeak;
 
   // 3. Mean Airway Pressure (Pmean)
   let pMean = 0;
@@ -176,7 +164,7 @@ export function calculatePhysiology(
   }
   etCO2 = Math.min(85, Math.max(18, Math.round(etCO2)));
 
-  return {
+  const result: CalculatedPhysiology = {
     pPeak: safeNumber(Math.round(pPeak), 20),
     pPlat: safeNumber(Math.round(pPlat), 15),
     pMean: safeNumber(Math.round(pMean * 10) / 10, 8.0),
@@ -192,5 +180,50 @@ export function calculatePhysiology(
     pfRatio: safeNumber(pfRatio, 400),
     ardsSeverity,
     flowPeak: safeNumber(Math.round(flowPeak), 60),
+    inspiratoryFlow: safeNumber(Math.round(inspiratoryFlow * 100) / 100, 1.5),
   };
+  if (!circuitConnected) {
+    return {
+      ...result,
+      pPeak: 0,
+      pPlat: 0,
+      pMean: 0,
+      peep: 0,
+      vTe: 0,
+      mVe: 0,
+      cStat: 0,
+      cDyn: 0,
+      etCO2: 0,
+      flowPeak: 0,
+      inspiratoryFlow: 0,
+    };
+  }
+  return result;
+}
+
+export type CapnogramPattern = 'normal' | 'shark-fin';
+
+export function getCapnogramValue(
+  timeInSec: number,
+  respiratoryRate: number,
+  etCO2: number,
+  pattern: CapnogramPattern = 'normal',
+  ieRatio = '1:2'
+): number {
+  const rate = Math.max(1, safeNumber(respiratoryRate, 12));
+  const endTidal = Math.max(0, safeNumber(etCO2, 0));
+  const phase = ((safeNumber(timeInSec, 0) * rate / 60) % 1 + 1) % 1;
+  const inspiration = 1 / (1 + Math.max(0.5, Number(ieRatio.split(':')[1]) || 2));
+  // The same breath clock as Paw/flow: CO2 is zero during inspiration,
+  // then dead-space baseline, upstroke and alveolar plateau in expiration.
+  if (phase < inspiration) return 0;
+  const expiration = (phase - inspiration) / (1 - inspiration);
+  if (expiration < 0.08) return 0;
+  const upstrokeEnd = pattern === 'shark-fin' ? 0.72 : 0.22;
+  if (expiration < upstrokeEnd) {
+    const progress = (expiration - 0.08) / (upstrokeEnd - 0.08);
+    return endTidal * 0.92 * Math.pow(progress, pattern === 'shark-fin' ? 0.65 : 1);
+  }
+  if (expiration < 0.96) return endTidal * (0.92 + 0.08 * (expiration - upstrokeEnd) / (0.96 - upstrokeEnd));
+  return endTidal * (1 - (expiration - 0.96) / 0.04);
 }

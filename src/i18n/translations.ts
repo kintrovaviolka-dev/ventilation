@@ -161,7 +161,7 @@ export interface TranslationDictionary {
 export const TRANSLATIONS: Record<Language, TranslationDictionary> = {
   en: {
     appTitle: 'Anesthesia & Mechanical Ventilation Simulator',
-    subtitle: 'GE Datex-Ohmeda Station • Interactive Clinical Trainer',
+    subtitle: 'Interactive educational model • Not a device emulation',
     modeLabel: 'Ventilation Mode',
     debugLabel: 'STATE DEBUG LINE',
     langLabel: 'Lang',
@@ -170,7 +170,7 @@ export const TRANSLATIONS: Record<Language, TranslationDictionary> = {
     disclaimer: 'Educational simulator based on simplified mathematical physiological models. Not intended for clinical diagnosis, patient treatment, or real ventilator titration.',
 
     welcome: {
-      title: 'ANESTHESIA CARESTATION 650',
+      title: 'ANESTHESIA & VENTILATION SIMULATOR',
       subtitle: 'INTEGRATED MECHANICAL VENTILATION SIMULATOR',
       systemReady: 'VENTILATOR SELF-CHECK PASSED • SYSTEM READY',
       startCaseBtn: 'START CASE',
@@ -283,7 +283,7 @@ export const TRANSLATIONS: Record<Language, TranslationDictionary> = {
         title: 'EtCO₂',
         subtitle: 'End-Tidal CO₂',
         desc: 'Partial pressure of CO2 at end of exhalation',
-        unit: 'mmHg',
+        unit: 'kPa',
       },
       pfRatio: {
         title: 'P/F',
@@ -358,7 +358,7 @@ export const TRANSLATIONS: Record<Language, TranslationDictionary> = {
       title: 'SYSTEM ALARMS',
       noAlarms: 'SYSTEM NOMINAL — NO ACTIVE ALARMS',
       highPressure: 'ALARM: HIGH INSPIRATORY PRESSURE LIMIT EXCEEDED',
-      lowSpO2: 'ALARM: LOW SpO₂ SATURATION (< 90%)',
+      lowSpO2: 'ALARM: LOW SpO₂ SATURATION (< 88%)',
       apnea: 'ALARM: APNEA DETECTED (> 20s WITHOUT BREATH)',
       lowMV: 'ALARM: LOW MINUTE VENTILATION (MVe < LIMIT)',
       highRR: 'ALARM: TACHYPNOE (HIGH RESPIRATORY RATE)',
@@ -374,7 +374,7 @@ export const TRANSLATIONS: Record<Language, TranslationDictionary> = {
 
   cs: {
     appTitle: 'Anesteziologický & Ventilační Simulátor',
-    subtitle: 'GE Datex-Ohmeda Stanice • Interaktivní Výukový Simulátor',
+    subtitle: 'Interaktivní výukový model • Nejde o emulaci konkrétního přístroje',
     modeLabel: 'Ventilační Režim',
     debugLabel: 'STAVOVÝ DEBUG ŘÁDEK',
     langLabel: 'Jazyk',
@@ -383,7 +383,7 @@ export const TRANSLATIONS: Record<Language, TranslationDictionary> = {
     disclaimer: 'Edukativní simulátor založený na zjednodušených matematických fyziologických modelech. Není určeno pro klinickou diagnostiku, léčbu pacientů ani reálné nastavování ventilátoru.',
 
     welcome: {
-      title: 'ANESTEZIOLOGICKÁ STANICE CARESTATION 650',
+      title: 'ANESTEZIOLOGICKÝ A VENTILAČNÍ SIMULÁTOR',
       subtitle: 'INTEGROVANÝ SIMULÁTOR MECHANICKÉ VENTILACE',
       systemReady: 'AUTOTEST VENTILÁTORU PROBĚHL ÚSPĚŠNĚ • SYSTÉM PŘIPRAVEN',
       startCaseBtn: 'ZAHÁJIT PŘÍPAD',
@@ -496,7 +496,7 @@ export const TRANSLATIONS: Record<Language, TranslationDictionary> = {
         title: 'EtCO₂',
         subtitle: 'End-tidální CO₂',
         desc: 'Parciální tlak CO2 na konci výdechu',
-        unit: 'mmHg',
+        unit: 'kPa',
       },
       pfRatio: {
         title: 'P/F',
@@ -571,7 +571,7 @@ export const TRANSLATIONS: Record<Language, TranslationDictionary> = {
       title: 'SYSTÉMOVÉ ALARMY',
       noAlarms: 'SYSTÉM OK — ŽÁDNÉ AKTIVNÍ ALARMY',
       highPressure: 'ALARM: PŘEKROČEN HORNÍ TLAKOVÝ LIMIT V DÝCHACÍCH CESTÁCH',
-      lowSpO2: 'ALARM: NÍZKÁ SATURACE KYSLÍKEM (SpO₂ < 90%)',
+      lowSpO2: 'ALARM: NÍZKÁ SATURACE KYSLÍKEM (SpO₂ < 88%)',
       apnea: 'ALARM: DETEKOVÁNA APNOE (BEZ DECHU > 20s)',
       lowMV: 'ALARM: NÍZKÁ MINUTOVÁ VENTILACE (MVe < LIMIT)',
       highRR: 'ALARM: TACHYPNOE (VYSOKÁ DECHOVÁ FREKVENCE)',
