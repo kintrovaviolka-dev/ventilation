@@ -55,3 +55,8 @@ Completed: Paw / flow / CO2 only, held large Ppeak / MVe / EtCO2 values, kPa at 
 - Explicit sinus / AF / ventricular-bigeminy demonstration selector, deterministic runtime and synchronized pulse waveform.
 - 72 tests, TypeScript, production build; browser 390/1440 and no production console errors. See latest handoff for interfaces and limitations.
 - User authorized committing/pushing the entire accumulated repair series to the current branch; generated dist excluded.
+
+### Additional medications — 2026-11-03
+- Ephedrine and metoprolol added through shared event model, mg bolus input, intake/drawer/packages/history and bilingual model-limit notes.
+- 76 tests, TypeScript/build; real drawer selection, explicit administration and monitor/history effects verified.
+- Technical constants and unmodeled effects documented in handoff; clinical calibration remains pending.

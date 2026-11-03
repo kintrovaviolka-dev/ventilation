@@ -28,6 +28,8 @@ test('opening the medication drawer presents an accessible package-selection dia
   assert.match(markup, /Rocuronium/);
   assert.match(markup, /Norepinephrine/);
   assert.match(markup, /Atropine/);
+  assert.match(markup, /Ephedrine/);
+  assert.match(markup, /Metoprolol/);
 
   assert.match(markup, /not safe dosing ranges/i);
   assert.doesNotMatch(markup, /Record administration/);

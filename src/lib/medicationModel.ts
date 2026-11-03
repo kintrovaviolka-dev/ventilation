@@ -1,4 +1,4 @@
-export type MedicationId = 'propofol' | 'sufentanil' | 'rocuronium' | 'norepinephrine' | 'atropine';
+export type MedicationId = 'propofol' | 'sufentanil' | 'rocuronium' | 'norepinephrine' | 'atropine' | 'ephedrine' | 'metoprolol';
 export type MedicationAdministration = 'bolus' | 'infusion';
 
 export interface MedicationDoseEvent {
@@ -14,6 +14,7 @@ export interface MedicationDoseEvent {
 interface MedicationDefinition {
   label: { cs: string; en: string };
   unit: string;
+  modelNote?: { cs: string; en: string };
   bolus?: { min: number; max: number; step: number; examples: number[]; reference: number; halfLifeSeconds: number };
   infusion?: { min: number; max: number; step: number; examples: number[]; reference: number; halfLifeSeconds: number };
 }
@@ -39,6 +40,25 @@ export const MEDICATIONS: Record<MedicationId, MedicationDefinition> = {
     unit: 'mcg',
     bolus: { min: 1, max: 100, step: 1, examples: [4, 8, 16], reference: 8, halfLifeSeconds: 90 },
     infusion: { min: 0.001, max: 1, step: 0.001, examples: [0.02, 0.05, 0.1], reference: 0.05, halfLifeSeconds: 120 },
+  },
+  ephedrine: {
+    label: { cs: 'Efedrin', en: 'Ephedrine' },
+    unit: 'mg',
+    // Technical simulator presets; decay is effect decay, not elimination half-life.
+    bolus: { min: 1, max: 30, step: 1, examples: [5, 10], reference: 5, halfLifeSeconds: 180 },
+    modelNote: {
+      cs: 'V modelu zvyšuje tepovou frekvenci a krevní tlak. Slábnutí odpovědi při opakovaných dávkách (tachyfylaxe) se zatím nemodeluje.',
+      en: 'In the model, increases heart rate and blood pressure. Diminished response to repeated doses (tachyphylaxis) is not yet modeled.',
+    },
+  },
+  metoprolol: {
+    label: { cs: 'Metoprolol', en: 'Metoprolol' },
+    unit: 'mg',
+    bolus: { min: 0.5, max: 15, step: 0.5, examples: [1, 2.5, 5], reference: 2.5, halfLifeSeconds: 600 },
+    modelNote: {
+      cs: 'V modelu snižuje tepovou frekvenci a krevní tlak. Nemění zvolený rytmus na sinusový; poruchy AV převodu ani bronchospasmus po betablokátoru se nemodelují.',
+      en: 'In the model, lowers heart rate and blood pressure. Does not convert the selected rhythm to sinus; AV conduction disorders and beta-blocker-induced bronchospasm are not modeled.',
+    },
   },
   atropine: {
     label: { cs: 'Atropin', en: 'Atropine' },
@@ -148,6 +168,16 @@ export function calculateMedicationEffects(
         effects.systolicPressureChange += 14 * intensity;
         effects.diastolicPressureChange += 8 * intensity;
         effects.heartRateChange += 2 * intensity;
+        break;
+      case 'ephedrine':
+        effects.heartRateChange += 18 * intensity;
+        effects.systolicPressureChange += 20 * intensity;
+        effects.diastolicPressureChange += 10 * intensity;
+        break;
+      case 'metoprolol':
+        effects.heartRateChange -= 24 * intensity;
+        effects.systolicPressureChange -= 14 * intensity;
+        effects.diastolicPressureChange -= 8 * intensity;
         break;
       case 'atropine':
         effects.heartRateChange += 18 * intensity;

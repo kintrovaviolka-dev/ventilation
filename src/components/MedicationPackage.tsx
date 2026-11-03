@@ -10,6 +10,8 @@ export function MedicationPackage({ medication, language, compact = false }: {
     sufentanil: { main: '#f0a74c', accent: '#fff1cf', type: 'ampoule' },
     rocuronium: { main: '#a78bfa', accent: '#f0eaff', type: 'vial' },
     norepinephrine: { main: '#f07883', accent: '#ffe9ec', type: 'box' },
+    ephedrine: { main: '#e4cc65', accent: '#fff7d1', type: 'ampoule' },
+    metoprolol: { main: '#d993bb', accent: '#ffe8f6', type: 'vial' },
     atropine: { main: '#80b9ff', accent: '#e8f4ff', type: 'ampoule' },
   };
   const color = palette[medication];
