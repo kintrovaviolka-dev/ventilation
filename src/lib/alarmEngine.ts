@@ -1,3 +1,5 @@
+import { co2Kpa, monitorNumber } from './monitorUnits';
+import type { RuntimeReadings } from './simulationRuntime';
 import { CalculatedPhysiology } from './physiologyEngine';
 import { Language } from '../types';
 import { TRANSLATIONS } from '../i18n/translations';
@@ -10,7 +12,7 @@ export interface ActiveAlarm {
 }
 
 export function detectAlarms(
-  physiology: CalculatedPhysiology,
+  physiology: CalculatedPhysiology | RuntimeReadings,
   language: Language
 ): ActiveAlarm[] {
   const t = TRANSLATIONS[language]?.alarms || TRANSLATIONS.en.alarms;
@@ -22,7 +24,7 @@ export function detectAlarms(
       id: 'highPressure_critical',
       level: 'critical',
       message: t.highPressure,
-      code: `Ppeak ${physiology.pPeak} cmH₂O (> 40)`,
+      code: `Ppeak ${monitorNumber(physiology.pPeak, language, 1)} cmH₂O (> 40)`,
     });
   } else if (physiology.pPeak > 35) {
     alarms.push({
@@ -31,7 +33,7 @@ export function detectAlarms(
       message: language === 'cs'
         ? 'VAROVÁNÍ: ZVÝŠENÝ VRCHOLOVÝ TLAK (> 35 cmH₂O)'
         : 'CAUTION: ELEVATED PEAK PRESSURE (> 35 cmH₂O)',
-      code: `Ppeak ${physiology.pPeak} cmH₂O`,
+      code: `Ppeak ${monitorNumber(physiology.pPeak, language, 1)} cmH₂O`,
     });
   }
 
@@ -41,7 +43,7 @@ export function detectAlarms(
       id: 'lowSpO2_critical',
       level: 'critical',
       message: t.lowSpO2,
-      code: `SpO₂ ${physiology.spO2}% (< 90%)`,
+      code: `SpO₂ ${physiology.spO2}% (< 88%)`,
     });
   } else if (physiology.spO2 < 92) {
     alarms.push({
@@ -55,58 +57,66 @@ export function detectAlarms(
   }
 
   // 3. Minute Ventilation Alarms (< 3.5 L/min critical, < 4.5 L/min warning)
-  if (physiology.mVe < 3.5) {
+  if (physiology.mVe !== null && physiology.mVe < 3.5) {
     alarms.push({
       id: 'lowMV_critical',
       level: 'critical',
       message: t.lowMV,
-      code: `MVe ${physiology.mVe} L/min (< 3.5)`,
+      code: `MVe ${monitorNumber(physiology.mVe, language, 1)} L/min (< 3.5)`,
     });
-  } else if (physiology.mVe < 4.5) {
+  } else if (physiology.mVe !== null && physiology.mVe < 4.5) {
     alarms.push({
       id: 'lowMV_warning',
       level: 'warning',
       message: language === 'cs'
         ? 'VAROVÁNÍ: NÍZKÁ MINUTOVÁ VENTILACE (< 4.5 L/min)'
         : 'CAUTION: LOW MINUTE VENTILATION (< 4.5 L/min)',
-      code: `MVe ${physiology.mVe} L/min`,
+      code: `MVe ${monitorNumber(physiology.mVe, language, 1)} L/min`,
     });
   }
 
+  // Independent low-frequency warning: low RR alone is not a diagnosis of hypoventilation.
+  if (physiology.rrTotal !== null && physiology.rrTotal < 8) alarms.push({
+    id: 'lowRR_warning', level: 'warning',
+    message: language === 'cs' ? 'NÍZKÁ DECHOVÁ FREKVENCE' : 'LOW RESPIRATORY RATE',
+    code: `RR ${monitorNumber(physiology.rrTotal, language, 1)} /min (< 8)`,
+  });
+  const et = (value: number) => monitorNumber(co2Kpa(value), language, 1);
+
   // 4. End-Tidal CO2 Alarms (> 55 or < 22 mmHg critical, > 48 or < 26 warning)
-  if (physiology.etCO2 > 55) {
+  if (physiology.etCO2 !== null && physiology.etCO2 > 55) {
     alarms.push({
       id: 'etco2High_critical',
       level: 'critical',
       message: t.etco2High,
-      code: `EtCO₂ ${physiology.etCO2} mmHg (> 55)`,
+      code: `EtCO₂ ${et(physiology.etCO2)} kPa (> ${et(55)})`,
     });
-  } else if (physiology.etCO2 < 22) {
+  } else if (physiology.etCO2 !== null && physiology.etCO2 < 22) {
     alarms.push({
       id: 'etco2Low_critical',
       level: 'critical',
       message: t.etco2Low,
-      code: `EtCO₂ ${physiology.etCO2} mmHg (< 22)`,
+      code: `EtCO₂ ${et(physiology.etCO2)} kPa (< ${et(22)})`,
     });
-  } else if (physiology.etCO2 > 48) {
+  } else if (physiology.etCO2 !== null && physiology.etCO2 > 48) {
     alarms.push({
       id: 'etco2High_warning',
       level: 'warning',
       message: language === 'cs'
         ? 'VAROVÁNÍ: VYSOKÝ EtCO₂ / HRANIČNÍ HYPOVENTILACE'
         : 'CAUTION: ELEVATED EtCO₂ / BORDERLINE HYPOVENTILATION',
-      code: `EtCO₂ ${physiology.etCO2} mmHg`,
+      code: `EtCO₂ ${et(physiology.etCO2)} kPa`,
     });
-  } else if (physiology.etCO2 < 26) {
+  } else if (physiology.etCO2 !== null && physiology.etCO2 < 26) {
     alarms.push({
       id: 'etco2Low_warning',
       level: 'warning',
       message: language === 'cs'
         ? 'VAROVÁNÍ: NÍZKÝ EtCO₂ / HRANIČNÍ HYPERVENTILACE'
         : 'CAUTION: LOW EtCO₂ / BORDERLINE HYPERVENTILATION',
-      code: `EtCO₂ ${physiology.etCO2} mmHg`,
+      code: `EtCO₂ ${et(physiology.etCO2)} kPa`,
     });
   }
 
-  return alarms;
+  return alarms.sort((a,b) => Number(b.level === 'critical') - Number(a.level === 'critical'));
 }

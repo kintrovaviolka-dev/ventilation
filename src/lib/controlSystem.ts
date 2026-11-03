@@ -100,6 +100,22 @@ export const SELECTABLE_PARAMETERS: ParameterSpec[] = [
     category: 'settings',
     options: ['1:1', '1:2', '1:3', '1:4'],
   },
+  ...[
+    ['flowTrigger', 'Flow trigger', 'Trigger', 'L/min', .5, 10, .5],
+    ['cycleOff', 'PSV cycling', 'ETS', '%', 5, 70, 5],
+    ['minTi', 'Minimum PSV inspiration', 'Ti min', 's', .1, 1, .1],
+    ['maxTi', 'Maximum PSV inspiration', 'Ti max', 's', 1, 4, .1],
+    ['apneaSeconds', 'Apnea timeout', 'Apnoea', 's', 5, 60, 1],
+    ['backupEnabled', 'Apnea backup (0 off, 1 on)', 'Backup', '', 0, 1, 1],
+    ['backupPinsp', 'Backup pressure above PEEP', 'Backup ΔP', 'cmH₂O', 10, 40, 1],
+    ['backupRr', 'Backup respiratory rate', 'Backup RR', '/min', 6, 40, 1],
+    ['spontaneousRate', 'Patient spontaneous rate', 'Patient RR', '/min', 0, 40, 1],
+    ['driveAmplitude', 'Patient effort amplitude', 'Drive', 'cmH₂O', 0, 15, .5],
+  ].map(([id, label, shortLabel, unit, min, max, step]) => ({
+    id, label, shortLabel, unit, min, max, step, color: 'primary', category: 'settings',
+  } as ParameterSpec)),
+  { id: 'backupIeRatio', label: 'Backup I:E', shortLabel: 'Backup I:E', unit: '', color: 'primary', category: 'settings', options: ['1:1', '1:2', '1:3', '1:4'] },
+
 ];
 
 export function getParamCurrentValue(
@@ -126,6 +142,31 @@ export function getParamCurrentValue(
     case 'ieRatio':
       return settings.ieRatio;
     default:
-      return 0;
+      return settings[paramId as keyof VentilatorSettings] ?? 0;
   }
 }
+
+// Parameters with no effect in the current simplified mode are not editable.
+export function isParameterEnabled(id: string, mode: VentMode): boolean {
+  if (id === 'vt') return mode === 'vc' || mode === 'simv';
+  if (id === 'pinsp') return mode === 'pc';
+  if (id === 'pSupport' || ['flowTrigger', 'cycleOff', 'minTi', 'maxTi'].includes(id)) return mode === 'ps' || mode === 'simv';
+  if (id.startsWith('backup') || id === 'apneaSeconds') return mode === 'ps';
+  if (id === 'rr' || id === 'ieRatio') return mode !== 'ps';
+  return true;
+}
+
+export function isValidParameterValue(param: ParameterSpec, value: number | string): boolean {
+  if (param.options) return param.options.includes(String(value));
+  if (typeof value !== 'number' || !Number.isFinite(value)) return false;
+  const min = param.min ?? 0;
+  const step = param.step ?? 1;
+  return value >= min && value <= (param.max ?? Infinity)
+    && Math.abs((value - min) / step - Math.round((value - min) / step)) < 1e-8;
+}
+
+export const CZECH_PARAMETER_LABELS: Record<string,string> = {
+  flowTrigger:'Průtokový trigger', cycleOff:'Ukončení tlakové podpory', minTi:'Minimální Ti', maxTi:'Maximální Ti',
+  apneaSeconds:'Limit apnoe', backupEnabled:'Záloha při apnoi (0 vypnuto, 1 zapnuto)', backupPinsp:'Záložní tlak nad PEEP',
+  backupRr:'Záložní frekvence', backupIeRatio:'Záložní I:E', spontaneousRate:'Spontánní frekvence pacienta', driveAmplitude:'Úsilí pacienta',
+};
